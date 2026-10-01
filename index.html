@@ -1,0 +1,1292 @@
+<!DOCTYPE html>
+<html lang="ja" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ピラミッド（超大富豪）</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        gold: {
+                            100: '#fef9c3',
+                            300: '#fde047',
+                            400: '#facc15',
+                            500: '#eab308',
+                            600: '#ca8a04',
+                            700: '#a16207',
+                        },
+                        velvet: '#120a17',
+                        table: '#112217',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- PeerJS for P2P Multiplay -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: #0b0b10;
+            color: #f3f4f6;
+            touch-action: manipulation;
+            user-select: none;
+        }
+
+        .felt-table {
+            background: radial-gradient(circle, #1a3a2a 0%, #0c1d14 100%);
+            box-shadow: inset 0 0 80px rgba(0,0,0,0.85);
+        }
+
+        .glass-panel {
+            background: rgba(18, 10, 23, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(234, 179, 8, 0.25);
+        }
+
+        /* CARD TIERS VISUAL STYLING */
+        .playing-card {
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .playing-card.selected {
+            transform: translateY(-16px) scale(1.06);
+            border-color: #facc15 !important;
+            box-shadow: 0 0 20px rgba(250, 204, 21, 0.8), 0 0 8px rgba(255, 255, 255, 0.9);
+            z-index: 20;
+        }
+
+        /* Tier 1: Rank 1 - Royal Supreme Gold */
+        .card-tier-1 {
+            background: linear-gradient(135deg, #451a03 0%, #78350f 50%, #b45309 100%);
+            border: 2px solid #facc15;
+            box-shadow: 0 0 12px rgba(250, 204, 21, 0.6);
+            animation: goldGlow 3s infinite alternate;
+        }
+        @keyframes goldGlow {
+            0% { box-shadow: 0 0 8px rgba(250, 204, 21, 0.4); }
+            100% { box-shadow: 0 0 18px rgba(250, 204, 21, 0.9); }
+        }
+
+        /* Tier 2: Ranks 2-3 - Mythic Sapphire Platinum */
+        .card-tier-2 {
+            background: linear-gradient(135deg, #0c4a6e 0%, #0369a1 50%, #0284c7 100%);
+            border: 1.5px solid #38bdf8;
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+        }
+
+        /* Tier 3: Ranks 4-6 - Epic Amethyst Emerald */
+        .card-tier-3 {
+            background: linear-gradient(135deg, #3b0764 0%, #581c87 50%, #064e3b 100%);
+            border: 1.5px solid #c084fc;
+            box-shadow: 0 0 8px rgba(192, 132, 252, 0.4);
+        }
+
+        /* Tier 4: Ranks 7-9 - Rare Bronze Steel */
+        .card-tier-4 {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 50%, #451a03 100%);
+            border: 1px solid #f97316;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Tier 5: Ranks 10-13 - Common Dark Velvet */
+        .card-tier-5 {
+            background: linear-gradient(135deg, #18181b 0%, #09090b 100%);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Custom scrollbars */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); }
+        ::-webkit-scrollbar-thumb { background: rgba(234, 179, 8, 0.3); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(234, 179, 8, 0.6); }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between overflow-x-hidden select-none">
+
+    <header class="glass-panel sticky top-0 z-40 px-4 py-2 border-b border-amber-500/30 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <span class="font-bold text-amber-400 text-lg sm:text-xl tracking-wider flex items-center gap-2">
+                <i class="fa-solid fa-pyramid text-amber-500"></i>ピラミッド（超大富豪）
+            </span>
+        </div>
+        <div class="flex items-center space-x-2">
+            <button id="btnStats" onclick="openStatsModal()" class="px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-xs sm:text-sm border border-amber-500/30 transition flex items-center gap-1.5">
+                <i class="fa-solid fa-chart-line"></i> <span class="hidden sm:inline">戦績</span>
+            </button>
+            <button id="btnHelp" onclick="openRuleModal()" class="px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-xs sm:text-sm border border-amber-500/30 transition flex items-center gap-1.5">
+                <i class="fa-solid fa-circle-question"></i> <span class="hidden sm:inline">ルール</span>
+            </button>
+            <button id="btnInterrupt" onclick="confirmInterruptGame()" class="hidden px-3 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 text-xs sm:text-sm border border-red-500/40 transition flex items-center gap-1.5">
+                <i class="fa-solid fa-house"></i> <span>ホーム</span>
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-grow flex flex-col justify-center items-center p-2 sm:p-4 relative">
+        
+        <!-- HOME SCREEN -->
+        <section id="homeScreen" class="w-full max-w-xl glass-panel rounded-2xl p-6 shadow-2xl border border-amber-500/30 text-center my-auto">
+            <div class="mb-6">
+                <div class="inline-block p-4 rounded-full bg-amber-500/10 border border-amber-500/30 mb-3">
+                    <i class="fa-solid fa-crown text-4xl text-amber-400"></i>
+                </div>
+                <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-400 to-amber-600">
+                    ピラミッド（超大富豪）
+                </h1>
+                <p class="text-xs text-neutral-400 mt-1">1(最強) 〜 13(最弱) の91枚デッキで競う変則思考戦</p>
+            </div>
+
+            <div class="space-y-4 text-left">
+                <!-- Mode Select -->
+                <div>
+                    <label class="block text-xs font-semibold text-amber-300 mb-1">ゲームモード</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button type="button" id="modeAiBtn" onclick="selectMode('ai')" class="py-2.5 px-3 rounded-xl border border-amber-500 bg-amber-500/20 text-amber-200 text-xs font-bold transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-robot"></i> 1人プレイ (対AI)
+                        </button>
+                        <button type="button" id="modeP2pBtn" onclick="selectMode('p2p')" class="py-2.5 px-3 rounded-xl border border-neutral-700 bg-neutral-800/60 text-neutral-400 text-xs font-bold transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-network-wired"></i> 通信対戦 (P2P)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Player Count Select -->
+                <div>
+                    <label class="block text-xs font-semibold text-amber-300 mb-1">対戦人数 (2人〜5人)</label>
+                    <div class="grid grid-cols-4 gap-2">
+                        <button onclick="setPlayerCount(2)" class="btn-pcount py-2 rounded-lg border border-neutral-700 bg-neutral-800/80 text-neutral-300 text-xs font-bold" data-count="2">2人</button>
+                        <button onclick="setPlayerCount(3)" class="btn-pcount py-2 rounded-lg border border-neutral-700 bg-neutral-800/80 text-neutral-300 text-xs font-bold" data-count="3">3人</button>
+                        <button onclick="setPlayerCount(4)" class="btn-pcount py-2 rounded-lg border border-amber-500 bg-amber-500/20 text-amber-200 text-xs font-bold" data-count="4">4人</button>
+                        <button onclick="setPlayerCount(5)" class="btn-pcount py-2 rounded-lg border border-neutral-700 bg-neutral-800/80 text-neutral-300 text-xs font-bold" data-count="5">5人</button>
+                    </div>
+                </div>
+
+                <!-- AI Difficulty -->
+                <div id="aiDifficultyGroup">
+                    <label class="block text-xs font-semibold text-amber-300 mb-1">AI思考レベル</label>
+                    <select id="aiDifficulty" class="w-full bg-neutral-900 border border-amber-500/30 rounded-lg p-2.5 text-xs text-neutral-200 focus:outline-none focus:border-amber-400">
+                        <option value="easy">よわい (初心者向け)</option>
+                        <option value="normal" selected>ふつう (標準思考)</option>
+                        <option value="hard">つよい (本気思考)</option>
+                    </select>
+                </div>
+
+                <!-- PeerJS Multiplay Controls -->
+                <div id="p2pControlsGroup" class="hidden space-y-3 bg-neutral-900/80 p-3 rounded-xl border border-amber-500/20">
+                    <div class="flex items-center justify-between text-xs text-neutral-300">
+                        <span>あなたのPeer ID:</span>
+                        <span id="myPeerId" class="font-mono text-amber-300 select-all font-bold">生成中...</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <input type="text" id="joinPeerId" placeholder="ホストのPeer IDを入力" class="flex-grow bg-neutral-950 border border-neutral-700 rounded-lg px-3 py-1.5 text-xs text-neutral-200">
+                        <button onclick="connectToHost()" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-neutral-950 text-xs font-bold rounded-lg transition">参加</button>
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="startGame()" class="w-full mt-6 py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-neutral-950 font-extrabold text-base tracking-wider shadow-lg shadow-amber-500/20 transition transform active:scale-95 flex items-center justify-center gap-2">
+                <i class="fa-solid fa-play"></i> 対局開始
+            </button>
+        </section>
+
+        <!-- GAME BOARD SCREEN -->
+        <section id="gameScreen" class="w-full max-w-5xl hidden flex flex-col gap-2 my-auto">
+            
+            <div class="felt-table rounded-2xl border border-amber-500/30 p-3 sm:p-5 flex flex-col justify-between min-h-[440px] relative overflow-hidden shadow-2xl">
+                
+                <!-- Opponents Area -->
+                <div id="opponentsArea" class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
+                    <!-- Dynamic Opponent Seats -->
+                </div>
+
+                <!-- Center Field -->
+                <div class="flex-grow flex flex-col justify-center items-center my-4 relative">
+                    
+                    <div id="fieldStatusMessage" class="text-xs text-amber-400/80 mb-2 font-medium tracking-widest uppercase">
+                        場はクリアされています（フリー）
+                    </div>
+
+                    <!-- Played Cards Stack -->
+                    <div id="fieldContainer" class="flex justify-center items-center gap-1.5 min-h-[110px] p-2 rounded-xl bg-black/30 border border-white/5 w-full max-w-md">
+                        <span class="text-neutral-500 text-xs">カードが出されていません</span>
+                    </div>
+                </div>
+
+                <!-- Game Logs Box -->
+                <div class="bg-black/50 rounded-xl p-2.5 border border-white/5 h-20 overflow-y-auto text-xs text-neutral-300 font-mono space-y-1" id="gameLogBox">
+                    <div class="text-amber-400/60">[システム] ゲームを開始しました。</div>
+                </div>
+            </div>
+
+            <div class="glass-panel rounded-2xl p-3 border border-amber-500/30 flex flex-col gap-2">
+                
+                <!-- Player Info Header -->
+                <div class="flex items-center justify-between text-xs px-2">
+                    <div class="flex items-center gap-2">
+                        <span id="myRankBadge" class="px-2 py-0.5 rounded bg-neutral-800 border border-neutral-700 text-neutral-400 font-bold">平民</span>
+                        <span id="myPlayerName" class="font-bold text-amber-200">Player 1 (あなた)</span>
+                        <span id="myStatusBadge" class="text-amber-400 text-2xs px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 hidden">思考中...</span>
+                    </div>
+                    <div class="text-neutral-400">
+                        手札: <span id="myHandCount" class="text-amber-300 font-bold">0</span> 枚
+                    </div>
+                </div>
+
+                <!-- Cards Hand Container -->
+                <div id="myHandContainer" class="flex justify-start sm:justify-center items-center gap-1 sm:gap-1.5 overflow-x-auto py-3 px-1 min-h-[115px]">
+                    <!-- Dynamic Hand Cards -->
+                </div>
+
+                <!-- Action Controls -->
+                <div class="flex items-center justify-center gap-3 pt-1">
+                    <button id="btnPass" onclick="userPass()" class="px-6 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-neutral-600 text-neutral-200 font-bold text-xs sm:text-sm transition flex items-center gap-2 shadow-md">
+                        <i class="fa-solid fa-forward"></i> パス
+                    </button>
+                    <button id="btnPlay" onclick="userPlayCards()" class="px-8 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-neutral-950 font-extrabold text-xs sm:text-sm transition flex items-center gap-2 shadow-lg shadow-amber-500/20">
+                        <i class="fa-solid fa-paper-plane"></i> カードを出す (<span id="selectedCount">0</span>)
+                    </button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Card Exchange Modal (For Upper Rank Selection) -->
+    <div id="exchangeModal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+        <div class="glass-panel max-w-lg w-full rounded-2xl p-6 border border-amber-500/40 text-center shadow-2xl">
+            <h3 class="text-xl font-bold text-amber-300 mb-1">階級戦・カード譲渡</h3>
+            <p id="exchangeDesc" class="text-xs text-neutral-300 mb-4">下位プレイヤーへ渡すカードを選択してください。</p>
+            
+            <div id="exchangeCardSelectArea" class="my-4">
+                <div id="exchangeHandContainer" class="flex justify-center gap-1.5 overflow-x-auto py-3"></div>
+            </div>
+
+            <button id="btnConfirmExchange" onclick="confirmUserExchange()" class="w-full py-3 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-extrabold rounded-xl text-sm transition mt-2 shadow-lg shadow-amber-500/20">
+                選択したカードを渡す
+            </button>
+        </div>
+    </div>
+
+    <!-- Private Exchange Result Summary Modal (Clear visuals for exchanged parties) -->
+    <div id="exchangeResultModal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+        <div class="glass-panel max-w-md w-full rounded-2xl p-6 border border-amber-500/40 text-center shadow-2xl space-y-4">
+            <div class="inline-block p-3 rounded-full bg-amber-500/10 border border-amber-500/30">
+                <i class="fa-solid fa-right-left text-3xl text-amber-400"></i>
+            </div>
+            <h3 class="text-xl font-bold text-amber-300">カード交換結果</h3>
+            <p id="exchangeSummaryText" class="text-xs text-neutral-300">交換内容の確認</p>
+
+            <div class="space-y-3 text-left bg-black/40 p-3 rounded-xl border border-white/5">
+                <div>
+                    <div class="text-2xs text-amber-400 font-bold mb-1.5"><i class="fa-solid fa-arrow-up-from-bracket mr-1"></i>渡したカード</div>
+                    <div id="exchangedGivenCards" class="flex gap-1.5 overflow-x-auto py-1"></div>
+                </div>
+                <div class="border-t border-white/10 pt-2">
+                    <div class="text-2xs text-emerald-400 font-bold mb-1.5"><i class="fa-solid fa-arrow-down-to-bracket mr-1"></i>受け取ったカード (最強順)</div>
+                    <div id="exchangedReceivedCards" class="flex gap-1.5 overflow-x-auto py-1"></div>
+                </div>
+            </div>
+
+            <button onclick="closeExchangeResultModal()" class="w-full py-3 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-extrabold rounded-xl text-xs sm:text-sm transition">
+                対局を開始する
+            </button>
+        </div>
+    </div>
+
+    <!-- Game End / Result Modal -->
+    <div id="resultModal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+        <div class="glass-panel max-w-md w-full rounded-2xl p-6 border border-amber-500/40 text-center shadow-2xl">
+            <div class="inline-block p-3 rounded-full bg-amber-500/10 border border-amber-500/30 mb-2">
+                <i class="fa-solid fa-trophy text-3xl text-amber-400"></i>
+            </div>
+            <h3 class="text-2xl font-black text-amber-300 mb-1">対局決着！</h3>
+            <p class="text-xs text-neutral-400 mb-4">本ラウンドの最終順位</p>
+
+            <div id="resultList" class="space-y-2 mb-6 text-left">
+                <!-- Dynamic ranking results -->
+            </div>
+
+            <div class="flex gap-2">
+                <button onclick="startNextRound()" class="flex-1 py-3 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold rounded-xl text-xs sm:text-sm transition">
+                    次の試合へ (階級戦)
+                </button>
+                <button onclick="returnToHome()" class="px-4 py-3 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-bold rounded-xl text-xs sm:text-sm transition">
+                    ホームへ
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Interrupt Confirmation Modal -->
+    <div id="interruptModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="glass-panel max-w-sm w-full rounded-2xl p-5 border border-red-500/40 text-center shadow-2xl">
+            <div class="inline-block p-3 rounded-full bg-red-500/10 border border-red-500/30 mb-2">
+                <i class="fa-solid fa-triangle-exclamation text-2xl text-red-400"></i>
+            </div>
+            <h3 class="text-lg font-bold text-neutral-100 mb-1">対局を中断しますか？</h3>
+            <p class="text-xs text-neutral-400 mb-4">現在の進行状況は破棄され、ホーム画面に戻ります。</p>
+            <div class="flex gap-2">
+                <button onclick="executeInterruptGame()" class="flex-1 py-2.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-xs transition">
+                    中断して戻る
+                </button>
+                <button onclick="closeInterruptModal()" class="flex-1 py-2.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-bold rounded-xl text-xs transition">
+                    キャンセル
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Modal -->
+    <div id="statsModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="glass-panel max-w-md w-full rounded-2xl p-6 border border-amber-500/40 shadow-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-amber-300"><i class="fa-solid fa-chart-pie mr-2"></i>通算戦績</h3>
+                <button onclick="closeStatsModal()" class="text-neutral-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="space-y-3 text-xs text-neutral-200">
+                <div class="flex justify-between border-b border-neutral-800 pb-2">
+                    <span>総プレイ回数:</span>
+                    <span id="statTotalGames" class="font-bold text-amber-300">0 回</span>
+                </div>
+                <div class="flex justify-between border-b border-neutral-800 pb-2">
+                    <span>大富豪（1位）獲得率:</span>
+                    <span id="statWinRate" class="font-bold text-amber-300">0 %</span>
+                </div>
+                <div class="grid grid-cols-5 gap-1 text-center pt-2" id="statRanksGrid"></div>
+            </div>
+            <button onclick="closeStatsModal()" class="w-full mt-6 py-2.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-bold rounded-xl text-xs transition">
+                閉じる
+            </button>
+        </div>
+    </div>
+
+    <!-- Rule Modal -->
+    <div id="ruleModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="glass-panel max-w-lg w-full rounded-2xl p-6 border border-amber-500/40 shadow-2xl max-h-[80vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="text-lg font-bold text-amber-300"><i class="fa-solid fa-book mr-2"></i>ピラミッド大富豪のルール</h3>
+                <button onclick="closeRuleModal()" class="text-neutral-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="space-y-3 text-xs text-neutral-300 leading-relaxed">
+                <div>
+                    <h4 class="font-bold text-amber-400 mb-0.5">1. 91枚のピラミッドデッキ</h4>
+                    <p>数字 1〜13 で構成され、1は1枚、2は2枚...13は13枚（合計91枚）入っています。数字が小さいほど強力です（1が最強、13が最弱）。全員に各11枚配られます。</p>
+                </div>
+                <div>
+                    <h4 class="font-bold text-amber-400 mb-0.5">2. カードデザイン階級</h4>
+                    <p>カードの強さ（1: 👑最高級ゴールド, 2-3: 💎ミシック, 4-6: 🛡️エピック, 7-9: ⭐レア, 10-13: ノーマル）に応じて豪華なグラフィックに変化します。</p>
+                </div>
+                <div>
+                    <h4 class="font-bold text-amber-400 mb-0.5">3. パスの厳格なルール</h4>
+                    <p>一度「パス」を選択すると、そのラウンド（場がクリアされるまで）は二度とカードを出せません。出せるプレイヤーが1人以下になると場がリセットされ、全員のパスが解除されます。</p>
+                </div>
+                <div>
+                    <h4 class="font-bold text-amber-400 mb-0.5">4. 階級戦（カード交換）</h4>
+                    <p>上位階級は不要なカードを選んで下位に渡します。下位階級（大貧民・貧民）は手札にある【最も強いカード（数字が一番小さいカード）】を強制提供します。交換内容は当事者のみに詳細通知されます。</p>
+                </div>
+            </div>
+            <button onclick="closeRuleModal()" class="w-full mt-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-bold rounded-xl text-xs transition">
+                了解
+            </button>
+        </div>
+    </div>
+
+    <script>
+        /* Web Audio API Sound Generator */
+        class SoundEffects {
+            constructor() { this.ctx = null; }
+            init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
+            play(type) {
+                if (!this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    const now = this.ctx.currentTime;
+
+                    if (type === 'play') {
+                        osc.frequency.setValueAtTime(440, now);
+                        osc.frequency.exponentialRampToValueAtTime(880, now + 0.08);
+                        gain.gain.setValueAtTime(0.15, now);
+                        gain.gain.linearRampToValueAtTime(0.01, now + 0.08);
+                        osc.start(now); osc.stop(now + 0.08);
+                    } else if (type === 'pass') {
+                        osc.frequency.setValueAtTime(300, now);
+                        osc.frequency.linearRampToValueAtTime(150, now + 0.1);
+                        gain.gain.setValueAtTime(0.1, now);
+                        gain.gain.linearRampToValueAtTime(0.01, now + 0.1);
+                        osc.start(now); osc.stop(now + 0.1);
+                    } else if (type === 'clear') {
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(523.25, now);
+                        osc.frequency.setValueAtTime(659.25, now + 0.08);
+                        osc.frequency.setValueAtTime(783.99, now + 0.16);
+                        gain.gain.setValueAtTime(0.2, now);
+                        gain.gain.linearRampToValueAtTime(0.01, now + 0.25);
+                        osc.start(now); osc.stop(now + 0.25);
+                    } else if (type === 'win') {
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(523.25, now);
+                        osc.frequency.setValueAtTime(659.25, now + 0.12);
+                        osc.frequency.setValueAtTime(783.99, now + 0.24);
+                        osc.frequency.setValueAtTime(1046.50, now + 0.36);
+                        gain.gain.setValueAtTime(0.25, now);
+                        gain.gain.linearRampToValueAtTime(0.01, now + 0.5);
+                        osc.start(now); osc.stop(now + 0.5);
+                    }
+                } catch(e) {}
+            }
+        }
+        const soundSFX = new SoundEffects();
+
+        const gameState = {
+            gameMode: 'ai',
+            playerCount: 4,
+            aiDifficulty: 'normal',
+            players: [],
+            fieldCards: [],
+            currentTurnIndex: 0,
+            lastPlayedPlayerIndex: -1,
+            finishCount: 0,
+            isProcessingTurn: false,
+            aiTimer: null,
+            selectedCardIds: new Set(),
+            peer: null,
+            connections: [],
+            isHost: true,
+            roundNumber: 1,
+            exchangeData: null
+        };
+
+        const RANKS_NAMES = {
+            2: ['大富豪', '大貧民'],
+            3: ['大富豪', '平民', '大貧民'],
+            4: ['大富豪', '富豪', '貧民', '大貧民'],
+            5: ['大富豪', '富豪', '平民', '貧民', '大貧民']
+        };
+
+        window.addEventListener('load', () => {
+            loadStats();
+            document.addEventListener('click', () => soundSFX.init(), { once: true });
+        });
+
+        // Mode and Peer Management
+        function selectMode(mode) {
+            gameState.gameMode = mode;
+            const aiBtn = document.getElementById('modeAiBtn');
+            const p2pBtn = document.getElementById('modeP2pBtn');
+            const aiGrp = document.getElementById('aiDifficultyGroup');
+            const p2pGrp = document.getElementById('p2pControlsGroup');
+
+            if (mode === 'ai') {
+                aiBtn.className = "py-2.5 px-3 rounded-xl border border-amber-500 bg-amber-500/20 text-amber-200 text-xs font-bold transition flex items-center justify-center gap-2";
+                p2pBtn.className = "py-2.5 px-3 rounded-xl border border-neutral-700 bg-neutral-800/60 text-neutral-400 text-xs font-bold transition flex items-center justify-center gap-2";
+                aiGrp.classList.remove('hidden');
+                p2pGrp.classList.add('hidden');
+            } else {
+                p2pBtn.className = "py-2.5 px-3 rounded-xl border border-amber-500 bg-amber-500/20 text-amber-200 text-xs font-bold transition flex items-center justify-center gap-2";
+                aiBtn.className = "py-2.5 px-3 rounded-xl border border-neutral-700 bg-neutral-800/60 text-neutral-400 text-xs font-bold transition flex items-center justify-center gap-2";
+                aiGrp.classList.add('hidden');
+                p2pGrp.classList.remove('hidden');
+                initPeer();
+            }
+        }
+
+        function setPlayerCount(count) {
+            gameState.playerCount = count;
+            document.querySelectorAll('.btn-pcount').forEach(btn => {
+                if (parseInt(btn.getAttribute('data-count')) === count) {
+                    btn.className = "btn-pcount py-2 rounded-lg border border-amber-500 bg-amber-500/20 text-amber-200 text-xs font-bold";
+                } else {
+                    btn.className = "btn-pcount py-2 rounded-lg border border-neutral-700 bg-neutral-800/80 text-neutral-300 text-xs font-bold";
+                }
+            });
+        }
+
+        function initPeer() {
+            if (gameState.peer) return;
+            try {
+                gameState.peer = new Peer();
+                gameState.peer.on('open', (id) => {
+                    document.getElementById('myPeerId').textContent = id;
+                });
+                gameState.peer.on('connection', (conn) => {
+                    gameState.connections.push(conn);
+                    conn.on('data', (data) => handlePeerData(data));
+                });
+            } catch(e) {}
+        }
+
+        function connectToHost() {
+            const hostId = document.getElementById('joinPeerId').value.trim();
+            if (!hostId || !gameState.peer) return;
+            const conn = gameState.peer.connect(hostId);
+            conn.on('open', () => {
+                gameState.connections.push(conn);
+                gameState.isHost = false;
+                addLog(`ホスト ${hostId} に接続しました。`);
+            });
+            conn.on('data', (data) => handlePeerData(data));
+        }
+
+        function handlePeerData(data) {
+            if (data.type === 'STATE_UPDATE') {
+                Object.assign(gameState, data.state);
+                renderUI();
+            }
+        }
+
+        function createPyramidDeck() {
+            const deck = [];
+            let id = 1;
+            for (let rank = 1; rank <= 13; rank++) {
+                for (let count = 0; count < rank; count++) {
+                    deck.push({ id: id++, rank: rank });
+                }
+            }
+            // Fisher-Yates shuffle
+            for (let i = deck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [deck[i], deck[j]] = [deck[j], deck[i]];
+            }
+            return deck;
+        }
+
+        // Tiered visual card DOM renderer
+        function createCardDOM(card, clickable = true) {
+            const div = document.createElement('div');
+            const r = card.rank;
+            
+            let tierClass = 'card-tier-5';
+            let iconClass = 'fa-layer-group';
+            let numColor = 'text-neutral-300';
+
+            if (r === 1) {
+                tierClass = 'card-tier-1';
+                iconClass = 'fa-crown text-amber-300';
+                numColor = 'text-amber-200 font-black';
+            } else if (r <= 3) {
+                tierClass = 'card-tier-2';
+                iconClass = 'fa-gem text-cyan-300';
+                numColor = 'text-cyan-200 font-bold';
+            } else if (r <= 6) {
+                tierClass = 'card-tier-3';
+                iconClass = 'fa-shield-halved text-purple-300';
+                numColor = 'text-purple-200 font-bold';
+            } else if (r <= 9) {
+                tierClass = 'card-tier-4';
+                iconClass = 'fa-star text-orange-300';
+                numColor = 'text-orange-200 font-medium';
+            }
+
+            div.className = `playing-card ${tierClass} w-11 h-16 sm:w-14 sm:h-20 rounded-lg flex flex-col justify-between p-1 select-none relative shadow-md ${clickable ? 'cursor-pointer' : ''} ${gameState.selectedCardIds.has(card.id) ? 'selected' : ''}`;
+            
+            div.innerHTML = `
+                <div class="text-xs ${numColor} leading-none font-extrabold">${r}</div>
+                <div class="text-center text-xs sm:text-base opacity-90 my-auto">
+                    <i class="fa-solid ${iconClass}"></i>
+                </div>
+                <div class="text-xs ${numColor} leading-none font-extrabold text-right">${r}</div>
+            `;
+            return div;
+        }
+
+        function startGame() {
+            soundSFX.init();
+            gameState.roundNumber = 1;
+            gameState.aiDifficulty = document.getElementById('aiDifficulty').value;
+            
+            gameState.players = [];
+            gameState.players.push({
+                id: 0,
+                name: 'Player 1 (あなた)',
+                isAI: false,
+                hand: [],
+                isPassed: false,
+                isFinished: false,
+                finishOrder: 0,
+                prevRankName: '平民'
+            });
+
+            for (let i = 1; i < gameState.playerCount; i++) {
+                gameState.players.push({
+                    id: i,
+                    name: `CPU ${i}`,
+                    isAI: true,
+                    hand: [],
+                    isPassed: false,
+                    isFinished: false,
+                    finishOrder: 0,
+                    prevRankName: '平民'
+                });
+            }
+
+            setupNewMatchRound();
+
+            document.getElementById('homeScreen').classList.add('hidden');
+            document.getElementById('gameScreen').classList.remove('hidden');
+            document.getElementById('btnInterrupt').classList.remove('hidden');
+        }
+
+        function setupNewMatchRound() {
+            clearAITimer();
+            gameState.fieldCards = [];
+            gameState.lastPlayedPlayerIndex = -1;
+            gameState.finishCount = 0;
+            gameState.isProcessingTurn = false;
+            gameState.selectedCardIds.clear();
+
+            const deck = createPyramidDeck();
+            
+            gameState.players.forEach((player) => {
+                player.hand = deck.splice(0, 11).sort((a, b) => a.rank - b.rank);
+                player.isPassed = false;
+                player.isFinished = false;
+                player.finishOrder = 0;
+            });
+
+            gameState.currentTurnIndex = Math.floor(Math.random() * gameState.players.length);
+            
+            addLog(`第 ${gameState.roundNumber} ラウンド開始（全員手札11枚）。`);
+            renderUI();
+            checkNextTurnTrigger();
+        }
+
+        function checkNextTurnTrigger() {
+            if (checkMatchEnd()) return;
+
+            const currentPlayer = gameState.players[gameState.currentTurnIndex];
+            if (!currentPlayer) return;
+
+            if (currentPlayer.isAI && !currentPlayer.isFinished && !currentPlayer.isPassed) {
+                processAITurn(gameState.currentTurnIndex);
+            }
+        }
+
+        function processAITurn(playerIdx) {
+            if (gameState.isProcessingTurn) return;
+            gameState.isProcessingTurn = true;
+
+            clearAITimer();
+
+            gameState.aiTimer = setTimeout(() => {
+                try {
+                    const player = gameState.players[playerIdx];
+                    if (!player || player.isFinished || player.isPassed || gameState.currentTurnIndex !== playerIdx) {
+                        gameState.isProcessingTurn = false;
+                        nextTurn();
+                        return;
+                    }
+
+                    const counts = Array(14).fill(0);
+                    player.hand.forEach(card => counts[card.rank]++);
+
+                    const field = gameState.fieldCards;
+                    let selectedAction = null;
+
+                    if (field.length === 0) {
+                        const candidateRanks = [];
+                        for (let r = 13; r >= 1; r--) {
+                            if (counts[r] > 0) candidateRanks.push(r);
+                        }
+
+                        if (candidateRanks.length > 0) {
+                            if (gameState.aiDifficulty === 'easy') {
+                                selectedAction = { rank: candidateRanks[0], qty: 1 };
+                            } else if (gameState.aiDifficulty === 'normal') {
+                                let chosenRank = candidateRanks[0];
+                                for (let r of candidateRanks) {
+                                    if (counts[r] > 1) { chosenRank = r; break; }
+                                }
+                                selectedAction = { rank: chosenRank, qty: Math.min(counts[chosenRank], 3) };
+                            } else {
+                                const nonStrong = candidateRanks.filter(r => r > 3);
+                                const targetList = nonStrong.length > 0 ? nonStrong : candidateRanks;
+                                let chosenRank = targetList[0];
+                                for (let r of targetList) {
+                                    if (counts[r] > 1) { chosenRank = r; break; }
+                                }
+                                selectedAction = { rank: chosenRank, qty: counts[chosenRank] };
+                            }
+                        }
+                    } else {
+                        const targetRank = field[0].rank;
+                        const targetQty = field.length;
+
+                        const validRanks = [];
+                        for (let r = targetRank - 1; r >= 1; r--) {
+                            if (counts[r] >= targetQty) validRanks.push(r);
+                        }
+
+                        if (validRanks.length > 0) {
+                            if (gameState.aiDifficulty === 'easy' && Math.random() < 0.35) {
+                                selectedAction = null;
+                            } else {
+                                selectedAction = { rank: validRanks[0], qty: targetQty };
+                            }
+                        } else {
+                            selectedAction = null;
+                        }
+                    }
+
+                    if (selectedAction) {
+                        const cardsToPlay = player.hand.filter(c => c.rank === selectedAction.rank).slice(0, selectedAction.qty);
+                        gameState.isProcessingTurn = false;
+                        executePlayCards(playerIdx, cardsToPlay);
+                    } else {
+                        gameState.isProcessingTurn = false;
+                        executePassTurn(playerIdx);
+                    }
+                } catch (e) {
+                    gameState.isProcessingTurn = false;
+                    executePassTurn(playerIdx);
+                }
+            }, 350 + Math.random() * 250);
+        }
+
+        function executePlayCards(playerIdx, cards) {
+            const player = gameState.players[playerIdx];
+            if (!player || cards.length === 0) return;
+
+            const playedIds = new Set(cards.map(c => c.id));
+            player.hand = player.hand.filter(c => !playedIds.has(c.id));
+
+            gameState.fieldCards = cards;
+            gameState.lastPlayedPlayerIndex = playerIdx;
+
+            soundSFX.play('play');
+            addLog(`${player.name} が ${cards[0].rank} を ${cards.length} 枚出しました。`);
+
+            if (player.hand.length === 0) {
+                gameState.finishCount++;
+                player.isFinished = true;
+                player.finishOrder = gameState.finishCount;
+                const rankName = getRankNameByOrder(gameState.finishCount, gameState.playerCount);
+                addLog(`🎉 ${player.name} が上がり！ (${rankName} 確定)`);
+                if (playerIdx === 0) confetti();
+            }
+
+            nextTurn();
+        }
+
+        function executePassTurn(playerIdx) {
+            const player = gameState.players[playerIdx];
+            if (!player) return;
+
+            player.isPassed = true;
+            soundSFX.play('pass');
+            addLog(`${player.name} がパスしました。`);
+
+            nextTurn();
+        }
+
+        function userPass() {
+            if (gameState.currentTurnIndex !== 0 || gameState.isProcessingTurn) return;
+            const myPlayer = gameState.players[0];
+            if (myPlayer.isFinished || myPlayer.isPassed) return;
+
+            executePassTurn(0);
+        }
+
+        function userPlayCards() {
+            if (gameState.currentTurnIndex !== 0 || gameState.isProcessingTurn) return;
+            const myPlayer = gameState.players[0];
+            if (myPlayer.isFinished || myPlayer.isPassed) return;
+
+            const selectedCards = myPlayer.hand.filter(c => gameState.selectedCardIds.has(c.id));
+            if (selectedCards.length === 0) return;
+
+            const firstRank = selectedCards[0].rank;
+            const allSame = selectedCards.every(c => c.rank === firstRank);
+            if (!allSame) {
+                alert("同じ数字のカードのみまとめて出せます。");
+                return;
+            }
+
+            if (gameState.fieldCards.length > 0) {
+                const reqQty = gameState.fieldCards.length;
+                const reqRank = gameState.fieldCards[0].rank;
+
+                if (selectedCards.length !== reqQty) {
+                    alert(`場の枚数 (${reqQty}枚) に合わせて出す必要があります。`);
+                    return;
+                }
+                if (firstRank >= reqRank) {
+                    alert(`場の数字 (${reqRank}) より強い数字（1に近い小さな数字）を出す必要があります。`);
+                    return;
+                }
+            }
+
+            gameState.selectedCardIds.clear();
+            executePlayCards(0, selectedCards);
+        }
+
+        function nextTurn() {
+            if (checkMatchEnd()) return;
+
+            const activePlayers = gameState.players.filter(p => !p.isFinished && !p.isPassed);
+
+            if (activePlayers.length <= 1) {
+                resetRound();
+                return;
+            }
+
+            let nextIdx = (gameState.currentTurnIndex + 1) % gameState.players.length;
+            let loopCount = 0;
+            const maxLoops = gameState.players.length * 2;
+
+            while ((gameState.players[nextIdx].isFinished || gameState.players[nextIdx].isPassed) && loopCount < maxLoops) {
+                nextIdx = (nextIdx + 1) % gameState.players.length;
+                loopCount++;
+            }
+
+            if (loopCount >= maxLoops) {
+                resetRound();
+                return;
+            }
+
+            gameState.currentTurnIndex = nextIdx;
+            renderUI();
+            checkNextTurnTrigger();
+        }
+
+        function resetRound() {
+            gameState.fieldCards = [];
+            gameState.players.forEach(p => {
+                if (!p.isFinished) p.isPassed = false;
+            });
+
+            let leaderIdx = gameState.lastPlayedPlayerIndex;
+            if (leaderIdx === -1 || gameState.players[leaderIdx].isFinished) {
+                leaderIdx = (leaderIdx >= 0 ? leaderIdx : 0) % gameState.players.length;
+                let loops = 0;
+                while (gameState.players[leaderIdx].isFinished && loops < gameState.players.length) {
+                    leaderIdx = (leaderIdx + 1) % gameState.players.length;
+                    loops++;
+                }
+            }
+
+            gameState.currentTurnIndex = leaderIdx;
+            addLog("🧹 場がクリアされました。パスが解除されます。");
+            soundSFX.play('clear');
+            renderUI();
+            checkNextTurnTrigger();
+        }
+
+        function checkMatchEnd() {
+            const unfinished = gameState.players.filter(p => !p.isFinished);
+            if (unfinished.length <= 1) {
+                if (unfinished.length === 1) {
+                    gameState.finishCount++;
+                    unfinished[0].isFinished = true;
+                    unfinished[0].finishOrder = gameState.finishCount;
+                }
+                onMatchComplete();
+                return true;
+            }
+            return false;
+        }
+
+        function getRankNameByOrder(order, totalPlayers) {
+            const list = RANKS_NAMES[totalPlayers] || RANKS_NAMES[4];
+            return list[order - 1] || '平民';
+        }
+
+        function onMatchComplete() {
+            soundSFX.play('win');
+            saveStats();
+
+            gameState.players.forEach(p => {
+                p.prevRankName = getRankNameByOrder(p.finishOrder, gameState.playerCount);
+            });
+
+            const resultList = document.getElementById('resultList');
+            resultList.innerHTML = '';
+
+            gameState.players
+                .slice()
+                .sort((a, b) => a.finishOrder - b.finishOrder)
+                .forEach((p, idx) => {
+                    const row = document.createElement('div');
+                    row.className = "flex justify-between items-center p-2.5 rounded-xl bg-neutral-900 border border-amber-500/20 text-xs";
+                    row.innerHTML = `
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-amber-400">#${idx + 1}</span>
+                            <span class="text-neutral-200 font-semibold">${p.name}</span>
+                        </div>
+                        <span class="px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-300 font-bold">${p.prevRankName}</span>
+                    `;
+                    resultList.appendChild(row);
+                });
+
+            document.getElementById('resultModal').classList.remove('hidden');
+        }
+
+        function startNextRound() {
+            document.getElementById('resultModal').classList.add('hidden');
+            gameState.roundNumber++;
+            initCardExchange();
+        }
+
+        function initCardExchange() {
+            const count = gameState.playerCount;
+            const players = gameState.players;
+
+            // Deal fresh cards for the new round
+            const deck = createPyramidDeck();
+            players.forEach(p => {
+                p.hand = deck.splice(0, 11).sort((a, b) => a.rank - b.rank);
+                p.isPassed = false;
+                p.isFinished = false;
+                p.finishOrder = 0;
+            });
+
+            const daiGofugo = players.find(p => p.prevRankName === '大富豪');
+            const daiHinmin = players.find(p => p.prevRankName === '大貧民');
+            const fugu = players.find(p => p.prevRankName === '富豪');
+            const hinmin = players.find(p => p.prevRankName === '貧民');
+
+            const exchanges = [];
+            if (daiGofugo && daiHinmin) exchanges.push({ upper: daiGofugo, lower: daiHinmin, count: 2 });
+            if (fugu && hinmin && count >= 4) exchanges.push({ upper: fugu, lower: hinmin, count: 1 });
+
+            if (exchanges.length === 0) {
+                setupNewMatchRound();
+                return;
+            }
+
+            // Lower-rank players MUST give their absolute strongest cards (smallest numbers: 1, 2, 3...)
+            exchanges.forEach(ex => {
+                // Sorting ascending guarantees hand[0..count] are the lowest numerical ranks = strongest cards!
+                ex.lower.hand.sort((a, b) => a.rank - b.rank);
+                ex.lowerGiven = ex.lower.hand.splice(0, ex.count);
+            });
+
+            // Check if human (Player 0) is involved in exchange
+            const userAsUpper = exchanges.find(ex => ex.upper.id === 0);
+            const userAsLower = exchanges.find(ex => ex.lower.id === 0);
+
+            if (userAsUpper) {
+                gameState.exchangeData = { exchange: userAsUpper, allExchanges: exchanges };
+                showExchangeModal(userAsUpper);
+            } else if (userAsLower) {
+                // Human is lower rank: Upper AI gives weakest cards (largest numbers)
+                userAsLower.upperGiven = userAsLower.upper.hand.splice(userAsLower.upper.hand.length - userAsLower.count, userAsLower.count);
+                
+                // Swap hands
+                userAsLower.upper.hand.push(...userAsLower.lowerGiven);
+                userAsLower.lower.hand.push(...userAsLower.upperGiven);
+
+                userAsLower.upper.hand.sort((a,b) => a.rank - b.rank);
+                userAsLower.lower.hand.sort((a,b) => a.rank - b.rank);
+
+                // Process non-human exchanges
+                exchanges.forEach(ex => {
+                    if (ex !== userAsLower) processAiExchange(ex);
+                });
+
+                // Show visual result summary to user
+                showExchangeResultModal(userAsLower.lowerGiven, userAsLower.upperGiven, `あなたは ${userAsLower.lower.prevRankName} として上位の ${userAsLower.upper.name} に最強カードを提供しました。`);
+            } else {
+                // Human is spectator/平民 -> Process all exchanges with anonymous logs
+                exchanges.forEach(ex => processAiExchange(ex));
+                setupNewMatchRound();
+            }
+        }
+
+        function processAiExchange(ex) {
+            // Upper AI gives weakest cards (highest numbers: 13, 12...)
+            ex.upper.hand.sort((a, b) => a.rank - b.rank);
+            ex.upperGiven = ex.upper.hand.splice(ex.upper.hand.length - ex.count, ex.count);
+
+            ex.upper.hand.push(...ex.lowerGiven);
+            ex.lower.hand.push(...ex.upperGiven);
+
+            ex.upper.hand.sort((a,b) => a.rank - b.rank);
+            ex.lower.hand.sort((a,b) => a.rank - b.rank);
+
+            // Anonymous privacy log for third parties
+            addLog(`【カード交換】${ex.upper.name} (${ex.upper.prevRankName}) と ${ex.lower.name} (${ex.lower.prevRankName}) がカード ${ex.count} 枚を交換しました。(内容は非公開)`);
+        }
+
+        function showExchangeModal(exData) {
+            const modal = document.getElementById('exchangeModal');
+            const desc = document.getElementById('exchangeDesc');
+            const container = document.getElementById('exchangeHandContainer');
+            
+            desc.textContent = `あなたは ${exData.upper.prevRankName} です。${exData.lower.name} (${exData.lower.prevRankName}) に渡す不要なカードを ${exData.count} 枚選択してください。`;
+            container.innerHTML = '';
+            
+            const myHand = gameState.players[0].hand;
+            gameState.selectedCardIds.clear();
+
+            myHand.forEach(card => {
+                const el = createCardDOM(card, true);
+                el.onclick = () => {
+                    if (gameState.selectedCardIds.has(card.id)) {
+                        gameState.selectedCardIds.delete(card.id);
+                        el.classList.remove('selected');
+                    } else {
+                        if (gameState.selectedCardIds.size < exData.count) {
+                            gameState.selectedCardIds.add(card.id);
+                            el.classList.add('selected');
+                        }
+                    }
+                };
+                container.appendChild(el);
+            });
+
+            modal.classList.remove('hidden');
+        }
+
+        function confirmUserExchange() {
+            if (!gameState.exchangeData) return;
+            const exData = gameState.exchangeData.exchange;
+
+            if (gameState.selectedCardIds.size !== exData.count) {
+                alert(`カードを ${exData.count} 枚選択してください。`);
+                return;
+            }
+
+            const myPlayer = gameState.players[0];
+            const selectedCards = myPlayer.hand.filter(c => gameState.selectedCardIds.has(c.id));
+            exData.upperGiven = selectedCards;
+
+            const selectedSet = new Set(gameState.selectedCardIds);
+            myPlayer.hand = myPlayer.hand.filter(c => !selectedSet.has(c.id));
+
+            myPlayer.hand.push(...exData.lowerGiven);
+            exData.lower.hand.push(...exData.upperGiven);
+
+            myPlayer.hand.sort((a,b) => a.rank - b.rank);
+            exData.lower.sort && exData.lower.hand.sort((a,b) => a.rank - b.rank);
+
+            // Process other AI exchanges silently with anonymous logs
+            gameState.exchangeData.allExchanges.forEach(ex => {
+                if (ex.upper.id !== 0) processAiExchange(ex);
+            });
+
+            document.getElementById('exchangeModal').classList.add('hidden');
+
+            // Show visual card summary to user
+            showExchangeResultModal(exData.upperGiven, exData.lowerGiven, `${exData.lower.name} (${exData.lower.prevRankName}) から最強カードを受け取りました！`);
+        }
+
+        function showExchangeResultModal(givenCards, receivedCards, text) {
+            document.getElementById('exchangeSummaryText').textContent = text;
+            
+            const givenBox = document.getElementById('exchangedGivenCards');
+            const recBox = document.getElementById('exchangedReceivedCards');
+            givenBox.innerHTML = '';
+            recBox.innerHTML = '';
+
+            givenCards.forEach(c => givenBox.appendChild(createCardDOM(c, false)));
+            receivedCards.forEach(c => recBox.appendChild(createCardDOM(c, false)));
+
+            document.getElementById('exchangeResultModal').classList.remove('hidden');
+        }
+
+        function closeExchangeResultModal() {
+            document.getElementById('exchangeResultModal').classList.add('hidden');
+            setupNewMatchRound();
+        }
+
+        function renderUI() {
+            const myPlayer = gameState.players[0];
+
+            document.getElementById('myRankBadge').textContent = myPlayer.prevRankName || '平民';
+            document.getElementById('myHandCount').textContent = myPlayer.hand.length;
+
+            const myStatusBadge = document.getElementById('myStatusBadge');
+            if (gameState.currentTurnIndex === 0 && !myPlayer.isFinished && !myPlayer.isPassed) {
+                myStatusBadge.classList.remove('hidden');
+                myStatusBadge.textContent = "あなたの番です！";
+            } else if (myPlayer.isPassed) {
+                myStatusBadge.classList.remove('hidden');
+                myStatusBadge.textContent = "パス中";
+            } else if (myPlayer.isFinished) {
+                myStatusBadge.classList.remove('hidden');
+                myStatusBadge.textContent = "上がり";
+            } else {
+                myStatusBadge.classList.add('hidden');
+            }
+
+            // Render Hand Cards
+            const handContainer = document.getElementById('myHandContainer');
+            handContainer.innerHTML = '';
+            
+            myPlayer.hand.forEach(card => {
+                const cardEl = createCardDOM(card);
+                cardEl.onclick = () => {
+                    if (gameState.currentTurnIndex !== 0 || myPlayer.isPassed || myPlayer.isFinished) return;
+                    if (gameState.selectedCardIds.has(card.id)) {
+                        gameState.selectedCardIds.delete(card.id);
+                    } else {
+                        gameState.selectedCardIds.add(card.id);
+                    }
+                    renderUI();
+                };
+                handContainer.appendChild(cardEl);
+            });
+
+            document.getElementById('selectedCount').textContent = gameState.selectedCardIds.size;
+
+            // Render Center Field
+            const fieldContainer = document.getElementById('fieldContainer');
+            const fieldMsg = document.getElementById('fieldStatusMessage');
+            fieldContainer.innerHTML = '';
+
+            if (gameState.fieldCards.length > 0) {
+                fieldMsg.textContent = `現在の場: 数字 ${gameState.fieldCards[0].rank} (${gameState.fieldCards.length}枚)`;
+                gameState.fieldCards.forEach(c => fieldContainer.appendChild(createCardDOM(c, false)));
+            } else {
+                fieldMsg.textContent = "場はクリアされています（フリー）";
+                fieldContainer.innerHTML = `<span class="text-neutral-500 text-xs">カードが出されていません</span>`;
+            }
+
+            // Render Opponents Seats
+            const oppArea = document.getElementById('opponentsArea');
+            oppArea.innerHTML = '';
+
+            gameState.players.slice(1).forEach(opp => {
+                const isCurrent = gameState.currentTurnIndex === opp.id;
+                const oppCard = document.createElement('div');
+                oppCard.className = `p-2.5 rounded-xl border ${isCurrent ? 'border-amber-400 bg-amber-500/10 shadow-lg shadow-amber-500/10' : 'border-neutral-800 bg-neutral-900/60'} text-xs flex flex-col justify-between transition`;
+                
+                oppCard.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <span class="font-bold text-neutral-200 truncate">${opp.name}</span>
+                        <span class="text-2xs px-1.5 py-0.5 rounded bg-neutral-800 text-amber-300 font-bold border border-neutral-700">${opp.prevRankName}</span>
+                    </div>
+                    <div class="flex items-center justify-between mt-2 text-neutral-400">
+                        <span><i class="fa-solid fa-clone mr-1"></i>${opp.hand.length} 枚</span>
+                        ${opp.isFinished ? '<span class="text-amber-400 font-bold">あがり</span>' : opp.isPassed ? '<span class="text-red-400">パス</span>' : isCurrent ? '<span class="text-amber-300 animate-pulse font-bold">思考中...</span>' : ''}
+                    </div>
+                `;
+                oppArea.appendChild(oppCard);
+            });
+
+            // Button Enabled States
+            const isMyTurn = gameState.currentTurnIndex === 0 && !myPlayer.isFinished && !myPlayer.isPassed;
+            document.getElementById('btnPlay').disabled = !isMyTurn;
+            document.getElementById('btnPass').disabled = !isMyTurn;
+            document.getElementById('btnPlay').style.opacity = isMyTurn ? '1' : '0.5';
+            document.getElementById('btnPass').style.opacity = isMyTurn ? '1' : '0.5';
+        }
+
+        function addLog(msg) {
+            const logBox = document.getElementById('gameLogBox');
+            const div = document.createElement('div');
+            div.textContent = msg;
+            logBox.appendChild(div);
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        function confirmInterruptGame() {
+            document.getElementById('interruptModal').classList.remove('hidden');
+        }
+
+        function closeInterruptModal() {
+            document.getElementById('interruptModal').classList.add('hidden');
+        }
+
+        function executeInterruptGame() {
+            closeInterruptModal();
+            returnToHome();
+        }
+
+        function clearAITimer() {
+            if (gameState.aiTimer) {
+                clearTimeout(gameState.aiTimer);
+                gameState.aiTimer = null;
+            }
+        }
+
+        function returnToHome() {
+            clearAITimer();
+            gameState.isProcessingTurn = false;
+            document.getElementById('gameScreen').classList.add('hidden');
+            document.getElementById('btnInterrupt').classList.add('hidden');
+            document.getElementById('resultModal').classList.add('hidden');
+            document.getElementById('exchangeModal').classList.add('hidden');
+            document.getElementById('exchangeResultModal').classList.add('hidden');
+            document.getElementById('homeScreen').classList.remove('hidden');
+        }
+
+        function loadStats() {
+            const raw = localStorage.getItem('pyramid_daifugo_stats');
+            if (raw) {
+                try { gameState.stats = JSON.parse(raw); } catch(e) {}
+            }
+            if (!gameState.stats) {
+                gameState.stats = { total: 0, wins: 0, ranks: { '大富豪': 0, '富豪': 0, '平民': 0, '貧民': 0, '大貧民': 0 } };
+            }
+        }
+
+        function saveStats() {
+            const myPlayer = gameState.players[0];
+            if (!myPlayer) return;
+
+            gameState.stats.total++;
+            if (myPlayer.finishOrder === 1) gameState.stats.wins++;
+            
+            const rName = myPlayer.prevRankName || '平民';
+            gameState.stats.ranks[rName] = (gameState.stats.ranks[rName] || 0) + 1;
+
+            localStorage.setItem('pyramid_daifugo_stats', JSON.stringify(gameState.stats));
+        }
+
+        function openStatsModal() {
+            loadStats();
+            document.getElementById('statTotalGames').textContent = `${gameState.stats.total} 回`;
+            const rate = gameState.stats.total > 0 ? Math.round((gameState.stats.wins / gameState.stats.total) * 100) : 0;
+            document.getElementById('statWinRate').textContent = `${rate} %`;
+
+            const grid = document.getElementById('statRanksGrid');
+            grid.innerHTML = '';
+            ['大富豪', '富豪', '平民', '貧民', '大貧民'].forEach(rk => {
+                const count = gameState.stats.ranks[rk] || 0;
+                const item = document.createElement('div');
+                item.className = "bg-neutral-900 border border-neutral-800 p-2 rounded-lg";
+                item.innerHTML = `
+                    <div class="text-amber-400 font-bold">${rk}</div>
+                    <div class="text-neutral-200 mt-1">${count}回</div>
+                `;
+                grid.appendChild(item);
+            });
+
+            document.getElementById('statsModal').classList.remove('hidden');
+        }
+
+        function closeStatsModal() {
+            document.getElementById('statsModal').classList.add('hidden');
+        }
+
+        function openRuleModal() {
+            document.getElementById('ruleModal').classList.remove('hidden');
+        }
+
+        function closeRuleModal() {
+            document.getElementById('ruleModal').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
