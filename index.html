@@ -1,0 +1,1656 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ピラミッド（超大富豪）</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Noto Sans JP', sans-serif;
+      background: #0a0c10;
+      color: #e2e8f0;
+      user-select: none;
+      overflow-x: hidden;
+    }
+    .font-cinzel { font-family: 'Cinzel', serif; }
+
+    /* Card Visuals by Tier */
+    .card-base {
+      transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+    }
+    .card-base:hover:not(.disabled) {
+      transform: translateY(-12px) scale(1.05);
+      z-index: 30;
+    }
+    .card-selected {
+      transform: translateY(-20px) scale(1.08) !important;
+      box-shadow: 0 0 20px rgba(234, 179, 8, 0.8), 0 0 10px rgba(255, 255, 255, 0.9) !important;
+      z-index: 40 !important;
+    }
+
+    /* Rank Specific Styles (1 is Strongest -> 13 is Weakest) */
+    .card-rank-1 {
+      background: linear-gradient(135deg, #2a1f00 0%, #6b5103 50%, #b8860b 100%);
+      border: 2px solid #ffd700;
+      color: #fff8dc;
+      box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+      animation: goldGlow 3s infinite alternate;
+    }
+    @keyframes goldGlow {
+      0% { box-shadow: 0 0 10px rgba(255, 215, 0, 0.4); }
+      100% { box-shadow: 0 0 22px rgba(255, 215, 0, 0.9); }
+    }
+    .card-rank-2, .card-rank-3 {
+      background: linear-gradient(135deg, #1e293b 0%, #334155 50%, #475569 100%);
+      border: 2px solid #38bdf8;
+      color: #f0f9ff;
+    }
+    .card-rank-4, .card-rank-5, .card-rank-6 {
+      background: linear-gradient(135deg, #1a0f1f 0%, #3b112c 50%, #581c3f 100%);
+      border: 1px solid #f43f5e;
+      color: #fff1f2;
+    }
+    .card-rank-7, .card-rank-8, .card-rank-9 {
+      background: linear-gradient(135deg, #0b1e19 0%, #064e3b 50%, #047857 100%);
+      border: 1px solid #10b981;
+      color: #ecfdf5;
+    }
+    .card-rank-10, .card-rank-11, .card-rank-12, .card-rank-13 {
+      background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
+      border: 1px solid #4b5563;
+      color: #9ca3af;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between bg-slate-950 text-slate-100">
+
+  <!-- TOP HEADER / NAV -->
+  <header class="w-full bg-slate-900/80 border-b border-slate-800 backdrop-blur px-4 py-3 flex justify-between items-center z-50">
+    <div class="flex items-center space-x-3">
+      <span class="text-2xl font-black tracking-wider text-amber-400 font-cinzel">PYRAMID</span>
+      <span class="text-xs bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">超大富豪</span>
+    </div>
+    <div class="flex items-center space-x-3">
+      <button id="btn-stats" class="px-3 py-1.5 text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg transition flex items-center gap-1">
+        📊 戦績
+      </button>
+      <button id="btn-rule" class="px-3 py-1.5 text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg transition">
+        📖 ルール
+      </button>
+      <button id="btn-leave" class="hidden px-3 py-1.5 text-xs font-bold bg-rose-900/60 hover:bg-rose-800 text-rose-200 border border-rose-700/50 rounded-lg transition">
+        🚪 退室
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="flex-grow flex flex-col items-center justify-center p-2 sm:p-4 relative overflow-hidden">
+    
+    <!-- BACKGROUND ART PATTERN -->
+    <div class="absolute inset-0 opacity-5 pointer-events-none flex items-center justify-center">
+      <div class="w-[600px] h-[600px] border-[40px] border-amber-500/30 rotate-45 rounded-3xl"></div>
+    </div>
+
+    <!-- 1. SCREEN: TITLE / MENU -->
+    <section id="screen-title" class="w-full max-w-md flex flex-col items-center space-y-6 z-10 py-6">
+      <div class="text-center space-y-2">
+        <h1 class="text-4xl sm:text-5xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-400 to-amber-600 font-cinzel drop-shadow-md">
+          PYRAMID
+        </h1>
+        <p class="text-xs text-slate-400 font-medium tracking-widest">91-CARD TACTICAL DAIFUGO</p>
+      </div>
+
+      <!-- Player Name Input -->
+      <div class="w-full bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-3">
+        <label class="block text-xs font-bold text-amber-400 uppercase tracking-wider">プレイヤー名</label>
+        <input type="text" id="player-name-input" maxlength="12" placeholder="名前を入力..." 
+          class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-100 focus:outline-none focus:border-amber-500 transition">
+      </div>
+
+      <!-- Play Modes Selection -->
+      <div class="w-full space-y-3">
+        <!-- Solo Mode Config -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-3">
+          <div class="flex justify-between items-center">
+            <span class="text-sm font-bold text-slate-200">1人モード（対AI戦）</span>
+            <span class="text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded">オフライン</span>
+          </div>
+          
+          <div class="grid grid-cols-2 gap-2 text-xs">
+            <div>
+              <label class="block text-slate-400 mb-1">対戦人数</label>
+              <select id="solo-players-count" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 font-bold focus:outline-none focus:border-amber-500">
+                <option value="2">2人対戦 (AI 1体)</option>
+                <option value="3">3人対戦 (AI 2体)</option>
+                <option value="4" selected>4人対戦 (AI 3体)</option>
+                <option value="5">5人対戦 (AI 4体)</option>
+                <option value="6">6人対戦 (AI 5体)</option>
+                <option value="7">7人対戦 (AI 6体)</option>
+                <option value="8">8人対戦 (AI 7体)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-slate-400 mb-1">AIの強さ</label>
+              <select id="solo-ai-difficulty" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 font-bold focus:outline-none focus:border-amber-500">
+                <option value="easy">よわい</option>
+                <option value="normal" selected>ふつう</option>
+                <option value="hard">つよい</option>
+              </select>
+            </div>
+          </div>
+
+          <button id="btn-start-solo" class="w-full py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black rounded-xl shadow-lg shadow-amber-500/20 transition transform active:scale-98">
+            ゲーム開始
+          </button>
+        </div>
+
+        <!-- Online Mode Config -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-3">
+          <div class="flex justify-between items-center">
+            <span class="text-sm font-bold text-slate-200">インターネット対戦（PeerJS）</span>
+            <span class="text-xs bg-sky-500/10 text-sky-400 border border-sky-500/20 px-2 py-0.5 rounded">P2P通信</span>
+          </div>
+
+          <div class="grid grid-cols-1 gap-2">
+            <button id="btn-create-online" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sky-400 font-bold rounded-xl transition">
+              ➕ 部屋をつくる（ホスト）
+            </button>
+            <div class="flex space-x-2">
+              <input type="text" id="join-room-id" placeholder="部屋コードを入力 (例: A8X2K9)" 
+                class="flex-grow bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono font-bold uppercase focus:outline-none focus:border-sky-500">
+              <button id="btn-join-online" class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs rounded-xl transition">
+                参加する
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. SCREEN: ONLINE LOBBY ROOM -->
+    <section id="screen-lobby" class="hidden w-full max-w-lg flex-col space-y-4 z-10 py-4">
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-2xl space-y-4">
+        <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+          <div>
+            <span class="text-xs font-bold text-slate-400 block">ROOM CODE</span>
+            <div class="flex items-center space-x-2">
+              <span id="display-room-code" class="text-2xl font-black font-mono text-sky-400 tracking-wider">------</span>
+              <button id="btn-copy-room" class="text-xs bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded text-slate-300 border border-slate-700">
+                📋 コピー
+              </button>
+            </div>
+          </div>
+          <div class="text-right">
+            <span id="lobby-status-badge" class="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+              待機中
+            </span>
+          </div>
+        </div>
+
+        <!-- Player List in Room -->
+        <div class="space-y-2">
+          <div class="flex justify-between items-center">
+            <span class="text-xs font-bold text-slate-400">参加プレイヤー (<span id="lobby-count">1</span>/8)</span>
+            <div id="host-ai-controls" class="hidden flex items-center space-x-1">
+              <select id="lobby-ai-diff" class="bg-slate-950 border border-slate-700 rounded px-2 py-0.5 text-xs text-slate-200">
+                <option value="easy">AI: よわい</option>
+                <option value="normal" selected>AI: ふつう</option>
+                <option value="hard">AI: つよい</option>
+              </select>
+              <button id="btn-add-ai" class="text-xs bg-slate-800 hover:bg-slate-700 text-sky-400 px-2 py-1 rounded border border-slate-700 font-bold">
+                + AI追加
+              </button>
+            </div>
+          </div>
+          
+          <div id="lobby-player-list" class="space-y-1.5 min-h-[140px] max-h-[220px] overflow-y-auto bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+            <!-- Dynamic Player Slots -->
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="space-y-2 pt-2">
+          <button id="btn-lobby-start" class="hidden w-full py-3 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white font-black rounded-xl shadow-lg shadow-sky-500/20 transition">
+            対戦を開始する
+          </button>
+          <button id="btn-lobby-leave" class="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 font-bold text-xs rounded-xl transition">
+            退室して戻る
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. SCREEN: GAME TABLE -->
+    <section id="screen-game" class="hidden w-full max-w-4xl flex-col justify-between flex-grow z-10 py-2 relative">
+      
+      <!-- Top Players Container (Opponents) -->
+      <div id="opponents-container" class="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full pt-1">
+        <!-- Dynamic Opponent Cards -->
+      </div>
+
+      <!-- Center Table Field (Played Cards & Logs) -->
+      <div class="my-auto py-4 flex flex-col items-center justify-center relative min-h-[180px]">
+        
+        <!-- Table Area Indicator -->
+        <div class="absolute inset-0 bg-slate-900/40 border border-slate-800/80 rounded-3xl backdrop-blur-sm -z-10"></div>
+        
+        <div class="text-center space-y-1 mb-2">
+          <div id="round-rank-info" class="text-xs font-bold text-amber-400/80 tracking-widest uppercase">ROUND 1</div>
+          <div id="table-status-text" class="text-xs font-bold text-slate-400">カードを出してください</div>
+        </div>
+
+        <!-- Current Table Cards Display -->
+        <div id="table-cards-display" class="flex flex-wrap items-center justify-center gap-2 min-h-[80px] px-4 py-2">
+          <div class="text-xs text-slate-600 italic">場にカードはありません</div>
+        </div>
+
+        <!-- Last Move Info -->
+        <div id="table-last-move" class="mt-2 text-xs font-bold text-slate-400 h-5"></div>
+      </div>
+
+      <!-- Bottom Player Controls & Hand -->
+      <div class="w-full space-y-2">
+        <!-- Action Control Buttons -->
+        <div class="flex items-center justify-center space-x-3">
+          <button id="btn-play-card" disabled class="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-sm rounded-xl shadow-lg disabled:opacity-30 disabled:pointer-events-none transition">
+            カードを出す
+          </button>
+          <button id="btn-pass" disabled class="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-bold text-sm rounded-xl disabled:opacity-30 disabled:pointer-events-none transition">
+            パス
+          </button>
+        </div>
+
+        <!-- Local Player Status Bar -->
+        <div class="flex justify-between items-center px-2">
+          <div class="flex items-center space-x-2">
+            <span id="my-player-name" class="text-sm font-black text-slate-200">YOU</span>
+            <span id="my-player-rank" class="text-xs bg-slate-800 border border-slate-700 px-2 py-0.5 rounded text-amber-400 font-bold">-</span>
+          </div>
+          <span id="my-turn-indicator" class="text-xs font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 opacity-0 transition">
+            あなたのターン
+          </span>
+        </div>
+
+        <!-- Local Player Hand Container -->
+        <div id="my-hand-container" class="flex justify-center items-center gap-1.5 sm:gap-2 overflow-x-auto py-3 px-2 min-h-[100px] bg-slate-900/80 border border-slate-800 rounded-2xl">
+          <!-- Hand cards dynamically rendered -->
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODAL: ROUND RESULT & NEXT GAME CONFIRMATION -->
+  <div id="modal-round-result" class="hidden fixed inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center z-50 p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-5 text-center">
+      <div class="space-y-1">
+        <h2 class="text-2xl font-black text-amber-400 font-cinzel">ROUND FINISHED</h2>
+        <p class="text-xs text-slate-400">順位が確定しました</p>
+      </div>
+
+      <div id="round-ranking-list" class="space-y-2 py-2 max-h-[220px] overflow-y-auto">
+        <!-- Dynamic Rankings -->
+      </div>
+
+      <button id="btn-next-round" class="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-sm rounded-xl shadow-lg shadow-amber-500/20 transition transform active:scale-98 flex items-center justify-center gap-2">
+        <span>🃏 カード交換・次の試合へ進む</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL: CARD EXCHANGE PHASE -->
+  <div id="modal-exchange" class="hidden fixed inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center z-50 p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+      <div class="text-center space-y-1">
+        <h2 class="text-xl font-black text-amber-400">カード交換</h2>
+        <p id="exchange-instruction" class="text-xs text-slate-300">渡すカードを選択してください</p>
+      </div>
+
+      <div id="exchange-cards-container" class="flex flex-wrap justify-center gap-2 max-h-[280px] overflow-y-auto p-2 bg-slate-950 rounded-xl border border-slate-800">
+        <!-- Cards to give -->
+      </div>
+
+      <div class="pt-2">
+        <button id="btn-confirm-exchange" disabled class="w-full py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl disabled:opacity-30 transition">
+          決定する
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: STATS -->
+  <div id="modal-stats" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+        <h3 class="text-base font-black text-amber-400">通算プレイ戦績</h3>
+        <button id="btn-close-stats" class="text-slate-400 hover:text-slate-200 text-lg">✕</button>
+      </div>
+      
+      <div id="stats-content" class="space-y-3 text-xs">
+        <!-- Dynamic Stats Content -->
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: RULES -->
+  <div id="modal-rule" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+        <h3 class="text-base font-black text-amber-400">ピラミッド（超大富豪）ルール</h3>
+        <button id="btn-close-rule" class="text-slate-400 hover:text-slate-200 text-lg">✕</button>
+      </div>
+      
+      <div class="overflow-y-auto space-y-3 text-xs text-slate-300 leading-relaxed pr-1">
+        <div class="bg-slate-950 p-3 rounded-lg border border-slate-800 space-y-1">
+          <span class="font-bold text-amber-400 block">■ ピラミッド型91枚デッキ</span>
+          <p>数字は1から13まで。1は1枚、2は2枚...13は13枚（合計91枚）。数字が小さいほど強力です（1が最強、13が最弱）。2〜5人対戦は初期手札11枚、6人以上は9枚。</p>
+        </div>
+        <div class="bg-slate-950 p-3 rounded-lg border border-slate-800 space-y-1">
+          <span class="font-bold text-amber-400 block">■ 厳格なパス制御（LOCKOUT）</span>
+          <p>自分のターンで出せるカードがあってもパスできます。ただし<strong class="text-rose-400">一度パスしたプレイヤーは場が流れるまでそのラウンド中二度とカードを出せません</strong>。</p>
+        </div>
+        <div class="bg-slate-950 p-3 rounded-lg border border-slate-800 space-y-1">
+          <span class="font-bold text-amber-400 block">■ 階級とカード交換</span>
+          <p>4人以上の対戦では、1位（大富豪）が最下位から最強カード2枚を受け取り、自分の手札から2枚を選んで渡します。2位（富豪）は1枚交換します。</p>
+        </div>
+        <div class="bg-slate-950 p-3 rounded-lg border border-slate-800 space-y-1">
+          <span class="font-bold text-amber-400 block">■ 次ラウンドのスタート（親）</span>
+          <p>新しいラウンドが始まる際、<strong class="text-amber-300">前のラウンドで最下位だったプレイヤー（大貧民）</strong>からターンがスタート（親）します。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONFIRM DIALOG -->
+  <div id="modal-confirm" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-xs w-full p-5 shadow-2xl space-y-4 text-center">
+      <p id="confirm-msg" class="text-sm font-bold text-slate-200">本当に退室しますか？</p>
+      <div class="flex space-x-2">
+        <button id="btn-confirm-yes" class="flex-1 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl">退室する</button>
+        <button id="btn-confirm-no" class="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl">キャンセル</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast-container" class="fixed top-16 left-1/2 transform -translate-x-1/2 z-50 pointer-events-none flex flex-col items-center space-y-2"></div>
+
+  <!-- JAVASCRIPT LOGIC -->
+  <script>
+    /* ==========================================================================
+       1. GAME ENGINE & GLOBAL STATE
+       ========================================================================== */
+    const STORAGE_KEY_NAME = 'pyr_player_name';
+    const STORAGE_KEY_STATS = 'pyr_stats_data';
+
+    const RANK_TITLES = {
+      2: ['富豪', '貧民'],
+      3: ['富豪', '平民', '貧民'],
+      4: ['大富豪', '富豪', '平民', '大貧民'],
+      5: ['大富豪', '富豪', '平民', '貧民', '大貧民'],
+      6: ['大富豪', '富豪', '平民', '平民', '貧民', '大貧民'],
+      7: ['大富豪', '富豪', '平民', '平民', '平民', '貧民', '大貧民'],
+      8: ['大富豪', '富豪', '平民', '平民', '平民', '平民', '貧民', '大貧民']
+    };
+
+    function createPyramidDeck() {
+      const deck = [];
+      let cardId = 0;
+      for (let num = 1; num <= 13; num++) {
+        for (let count = 0; count < num; count++) {
+          deck.push({ id: cardId++, num: num });
+        }
+      }
+      return shuffle(deck);
+    }
+
+    function shuffle(array) {
+      const arr = [...array];
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    let appState = {
+      mode: 'solo',
+      isHost: true,
+      myId: '',
+      peer: null,
+      connections: [],
+      hostConn: null,
+      players: [],
+      selectedCardIds: [],
+      stats: loadStats(),
+      game: null,
+      gameSync: null
+    };
+
+    function loadStats() {
+      try {
+        const data = localStorage.getItem(STORAGE_KEY_STATS);
+        return data ? JSON.parse(data) : { plays: 0, wins: 0, ranks: {} };
+      } catch (e) {
+        return { plays: 0, wins: 0, ranks: {} };
+      }
+    }
+
+    function saveStats(rank, totalPlayers) {
+      appState.stats.plays++;
+      if (rank === 1) appState.stats.wins++;
+      const key = `${totalPlayers}P`;
+      appState.stats.ranks[key] = appState.stats.ranks[key] || {};
+      appState.stats.ranks[key][rank] = (appState.stats.ranks[key][rank] || 0) + 1;
+      localStorage.setItem(STORAGE_KEY_STATS, JSON.stringify(appState.stats));
+    }
+
+    /* ==========================================================================
+       2. UI NAVIGATION & DOM HELPERS
+       ========================================================================== */
+    const dom = {
+      playerNameInput: document.getElementById('player-name-input'),
+      soloPlayersCount: document.getElementById('solo-players-count'),
+      soloAiDifficulty: document.getElementById('solo-ai-difficulty'),
+      screenTitle: document.getElementById('screen-title'),
+      screenLobby: document.getElementById('screen-lobby'),
+      screenGame: document.getElementById('screen-game'),
+      btnLeave: document.getElementById('btn-leave'),
+      btnStats: document.getElementById('btn-stats'),
+      btnRule: document.getElementById('btn-rule'),
+      
+      // Lobby
+      displayRoomCode: document.getElementById('display-room-code'),
+      btnCopyRoom: document.getElementById('btn-copy-room'),
+      lobbyStatusBadge: document.getElementById('lobby-status-badge'),
+      lobbyCount: document.getElementById('lobby-count'),
+      lobbyPlayerList: document.getElementById('lobby-player-list'),
+      hostAiControls: document.getElementById('host-ai-controls'),
+      btnStartSolo: document.getElementById('btn-start-solo'),
+      btnCreateOnline: document.getElementById('btn-create-online'),
+      btnJoinOnline: document.getElementById('btn-join-online'),
+      joinRoomId: document.getElementById('join-room-id'),
+      btnLobbyStart: document.getElementById('btn-lobby-start'),
+      btnLobbyLeave: document.getElementById('btn-lobby-leave'),
+      btnAddAi: document.getElementById('btn-add-ai'),
+      lobbyAiDiff: document.getElementById('lobby-ai-diff'),
+
+      // Game
+      opponentsContainer: document.getElementById('opponents-container'),
+      roundRankInfo: document.getElementById('round-rank-info'),
+      tableStatusText: document.getElementById('table-status-text'),
+      tableCardsDisplay: document.getElementById('table-cards-display'),
+      tableLastMove: document.getElementById('table-last-move'),
+      btnPlayCard: document.getElementById('btn-play-card'),
+      btnPass: document.getElementById('btn-pass'),
+      myPlayerName: document.getElementById('my-player-name'),
+      myPlayerRank: document.getElementById('my-player-rank'),
+      myTurnIndicator: document.getElementById('my-turn-indicator'),
+      myHandContainer: document.getElementById('my-hand-container'),
+
+      // Modals
+      modalRoundResult: document.getElementById('modal-round-result'),
+      roundRankingList: document.getElementById('round-ranking-list'),
+      btnNextRound: document.getElementById('btn-next-round'),
+      modalStats: document.getElementById('modal-stats'),
+      btnCloseStats: document.getElementById('btn-close-stats'),
+      statsContent: document.getElementById('stats-content'),
+      modalRule: document.getElementById('modal-rule'),
+      btnCloseRule: document.getElementById('btn-close-rule'),
+      modalConfirm: document.getElementById('modal-confirm'),
+      confirmMsg: document.getElementById('confirm-msg'),
+      btnConfirmYes: document.getElementById('btn-confirm-yes'),
+      btnConfirmNo: document.getElementById('btn-confirm-no'),
+      modalExchange: document.getElementById('modal-exchange'),
+      exchangeInstruction: document.getElementById('exchange-instruction'),
+      exchangeCardsContainer: document.getElementById('exchange-cards-container'),
+      btnConfirmExchange: document.getElementById('btn-confirm-exchange')
+    };
+
+    const savedName = localStorage.getItem(STORAGE_KEY_NAME) || 'プレイヤー1';
+    dom.playerNameInput.value = savedName;
+    dom.playerNameInput.addEventListener('change', () => {
+      const val = dom.playerNameInput.value.trim() || 'プレイヤー1';
+      localStorage.setItem(STORAGE_KEY_NAME, val);
+    });
+
+    function showScreen(screen) {
+      dom.screenTitle.classList.add('hidden');
+      dom.screenLobby.classList.add('hidden');
+      dom.screenGame.classList.add('hidden');
+      screen.classList.remove('hidden');
+
+      if (screen === dom.screenGame) {
+        dom.btnLeave.classList.remove('hidden');
+      } else {
+        dom.btnLeave.classList.add('hidden');
+      }
+    }
+
+    function showToast(msg, duration = 3000) {
+      const toast = document.createElement('div');
+      toast.className = 'px-4 py-2 bg-slate-800/95 border border-amber-500/50 text-amber-200 text-xs font-bold rounded-xl shadow-2xl backdrop-blur transition-all duration-300 transform translate-y-[-10px] opacity-0';
+      toast.innerText = msg;
+      document.getElementById('toast-container').appendChild(toast);
+      
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-[-10px]', 'opacity-0');
+      });
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-[-10px]');
+        setTimeout(() => toast.remove(), 300);
+      }, duration);
+    }
+
+    function showConfirm(msg, onYes) {
+      dom.confirmMsg.innerText = msg;
+      dom.modalConfirm.classList.remove('hidden');
+      
+      const handleYes = () => {
+        dom.modalConfirm.classList.add('hidden');
+        cleanupConfirm();
+        onYes();
+      };
+      const handleNo = () => {
+        dom.modalConfirm.classList.add('hidden');
+        cleanupConfirm();
+      };
+      function cleanupConfirm() {
+        dom.btnConfirmYes.removeEventListener('click', handleYes);
+        dom.btnConfirmNo.removeEventListener('click', handleNo);
+      }
+      dom.btnConfirmYes.addEventListener('click', handleYes);
+      dom.btnConfirmNo.addEventListener('click', handleNo);
+    }
+
+    /* ==========================================================================
+       3. PEERJS P2P ONLINE ENGINE (ID自動リトライ＆堅牢化版)
+       ========================================================================== */
+    function generateRoomCode() {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let result = '';
+      for (let i = 0; i < 6; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return result;
+    }
+
+    function normalizeRoomCode(code) {
+      if (!code) return '';
+      let clean = code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (clean.startsWith('PYR')) clean = clean.replace(/^PYR/, '');
+      return clean;
+    }
+
+    function initPeer(customCode = null, callback = null) {
+      const code = customCode || generateRoomCode();
+      const peerId = `PYR-${code}`;
+      
+      if (appState.peer) {
+        try { appState.peer.destroy(); } catch (e) {}
+      }
+
+      appState.peer = new Peer(peerId, {
+        debug: 1,
+        config: {
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' }
+          ]
+        }
+      });
+
+      appState.peer.on('open', (id) => {
+        appState.myId = id;
+        if (callback) callback(code);
+      });
+
+      appState.peer.on('connection', (conn) => {
+        if (!appState.isHost) return;
+        
+        conn.on('open', () => {
+          appState.connections.push(conn);
+          setupHostConnHandlers(conn);
+        });
+      });
+
+      appState.peer.on('error', (err) => {
+        console.warn('PeerJS Warning/Error:', err);
+        if (err.type === 'peer-unavailable') {
+          showToast('指定された部屋が見つかりませんでした。コードを確認してください。');
+        } else if (err.type === 'unavailable-id') {
+          if (appState.isHost) {
+            showToast('部屋IDの競合を検知しました。再試行中...');
+            setTimeout(() => {
+              initPeer(null, callback);
+            }, 500);
+          } else {
+            showToast('部屋IDがすでに使用されています。');
+          }
+        } else {
+          showToast('通信サーバーに接続できませんでした（混雑またはネットワーク制限）');
+        }
+      });
+    }
+
+    function setupHostConnHandlers(conn) {
+      conn.on('data', (data) => {
+        handleHostReceivedMessage(conn, data);
+      });
+
+      conn.on('close', () => {
+        handlePlayerDisconnect(conn.peer);
+      });
+
+      conn.on('error', () => {
+        handlePlayerDisconnect(conn.peer);
+      });
+    }
+
+    function handleHostReceivedMessage(conn, msg) {
+      if (!appState.isHost) return;
+
+      if (msg.type === 'JOIN_LOBBY') {
+        if (appState.players.length >= 8) {
+          conn.send({ type: 'ERROR', message: '部屋が満員です（最大8人）' });
+          return;
+        }
+        const newPlayer = {
+          id: conn.peer,
+          name: msg.name || 'ゲスト',
+          isAI: false,
+          conn: conn
+        };
+        appState.players.push(newPlayer);
+        broadcastLobbyState();
+      } 
+      else if (msg.type === 'ACTION_PLAY') {
+        if (!appState.game) return;
+        executePlayCard(msg.playerId, msg.cardIds);
+      }
+      else if (msg.type === 'ACTION_PASS') {
+        if (!appState.game) return;
+        executePass(msg.playerId);
+      }
+      else if (msg.type === 'ACTION_EXCHANGE') {
+        if (!appState.game) return;
+        handleExchangeSubmit(msg.playerId, msg.cardIds);
+      }
+    }
+
+    function broadcastLobbyState() {
+      if (!appState.isHost) return;
+      const lobbyData = {
+        type: 'LOBBY_STATE',
+        players: appState.players.map(p => ({ id: p.id, name: p.name, isAI: p.isAI, aiDiff: p.aiDiff }))
+      };
+      
+      appState.connections.forEach(c => {
+        if (c.open) c.send(lobbyData);
+      });
+      renderLobby();
+    }
+
+    function broadcastGameState() {
+      if (!appState.isHost || !appState.game) return;
+
+      appState.players.forEach(p => {
+        if (p.isAI) return;
+
+        const sanitizedState = JSON.parse(JSON.stringify(appState.game));
+        
+        sanitizedState.players.forEach(otherP => {
+          if (otherP.id !== p.id) {
+            otherP.hand = otherP.hand.map(() => ({ id: -1, num: 0 }));
+          }
+        });
+
+        if (p.id === appState.myId) {
+          appState.gameSync = sanitizedState;
+          renderGameScreen();
+        } else {
+          // 元の game.players から有効なコネクションを取得して安全に送信
+          const origPlayer = appState.game.players.find(gp => gp.id === p.id);
+          if (origPlayer && origPlayer.conn && origPlayer.conn.open) {
+            origPlayer.conn.send({ type: 'SYNC_STATE', state: sanitizedState });
+          }
+        }
+      });
+    }
+
+    function handlePlayerDisconnect(peerId) {
+      const pIndex = appState.players.findIndex(p => p.id === peerId);
+      if (pIndex !== -1) {
+        if (appState.game && appState.game.status === 'playing') {
+          showToast('プレイヤーの接続が切断されました');
+          appState.players[pIndex].isAI = true;
+          appState.players[pIndex].aiDiff = 'hard';
+          appState.players[pIndex].name += ' (AI引き継ぎ)';
+          appState.game.players[pIndex].isAI = true;
+          appState.game.players[pIndex].aiDiff = 'hard';
+          appState.game.players[pIndex].name += ' (AI)';
+          
+          showToast(`${appState.players[pIndex].name} が強AIに引き継がれました`);
+          
+          broadcastGameState();
+
+          if (appState.game.turnIndex === pIndex) {
+            triggerAITurnIfNeeded();
+          }
+        } else {
+          appState.players.splice(pIndex, 1);
+          appState.connections = appState.connections.filter(c => c.peer !== peerId);
+          broadcastLobbyState();
+        }
+      }
+    }
+
+    /* ==========================================================================
+       4. GAME MECHANICS & RULES ENGINE
+       ========================================================================== */
+    function startNewGame(playerConfigs) {
+      const deck = createPyramidDeck();
+      const initialHandCount = playerConfigs.length >= 6 ? 9 : 11;
+
+      const players = playerConfigs.map((cfg) => ({
+        id: cfg.id,
+        name: cfg.name,
+        isAI: cfg.isAI,
+        aiDiff: cfg.aiDiff || 'normal',
+        conn: cfg.conn || null,
+        hand: [],
+        rankTitle: null,
+        finishedRank: null,
+        prevRank: null,
+        hasExchanged: false,
+        passed: false
+      }));
+
+      players.forEach(p => {
+        p.hand = deck.splice(0, initialHandCount).sort((a, b) => a.num - b.num);
+      });
+
+      appState.game = {
+        players: players,
+        turnIndex: 0,
+        tableCards: [],
+        lastPlayedBy: null,
+        passedPlayers: [],
+        roundCount: 1,
+        status: 'playing',
+        finishedCount: 0,
+        lastMoveInfo: 'ゲーム開始！'
+      };
+
+      if (appState.isHost) {
+        broadcastGameState();
+        triggerAITurnIfNeeded();
+      }
+    }
+
+    function executePlayCard(playerId, cardIds) {
+      if (!appState.isHost || !appState.game) return;
+      const game = appState.game;
+      const player = game.players.find(p => p.id === playerId);
+      if (!player || game.players[game.turnIndex].id !== playerId) return;
+
+      const playedCards = player.hand.filter(c => cardIds.includes(c.id));
+      if (playedCards.length === 0) return;
+
+      const cardNum = playedCards[0].num;
+      if (!playedCards.every(c => c.num === cardNum)) return;
+
+      if (game.tableCards.length > 0) {
+        const tableNum = game.tableCards[0].num;
+        if (playedCards.length !== game.tableCards.length || cardNum >= tableNum) {
+          return;
+        }
+      }
+
+      player.hand = player.hand.filter(c => !cardIds.includes(c.id));
+      game.tableCards = playedCards;
+      game.lastPlayedBy = playerId;
+      game.lastMoveInfo = `${player.name} が ${cardNum} を ${playedCards.length}枚出しました`;
+
+      if (player.hand.length === 0 && !player.finishedRank) {
+        game.finishedCount++;
+        player.finishedRank = game.finishedCount;
+        showToast(`🎉 ${player.name} が ${player.finishedRank}位で上がり！`);
+      }
+
+      const activePlayers = game.players.filter(p => p.hand.length > 0);
+      if (activePlayers.length <= 1) {
+        if (activePlayers.length === 1) {
+          game.finishedCount++;
+          activePlayers[0].finishedRank = game.finishedCount;
+        }
+        endGameRound();
+        return;
+      }
+
+      advanceTurn();
+    }
+
+    function executePass(playerId) {
+      if (!appState.isHost || !appState.game) return;
+      const game = appState.game;
+      const player = game.players.find(p => p.id === playerId);
+      if (!player || game.players[game.turnIndex].id !== playerId) return;
+
+      if (!game.passedPlayers.includes(playerId)) {
+        game.passedPlayers.push(playerId);
+      }
+      game.lastMoveInfo = `${player.name} がパスしました`;
+
+      advanceTurn();
+    }
+
+    function advanceTurn() {
+      const game = appState.game;
+
+      const remainingActive = game.players.filter(p => p.hand.length > 0 && !game.passedPlayers.includes(p.id));
+
+      if (remainingActive.length === 0 || (remainingActive.length === 1 && remainingActive[0].id === game.lastPlayedBy)) {
+        game.tableCards = [];
+        game.passedPlayers = [];
+        game.lastMoveInfo = '場が流れました';
+        
+        if (game.lastPlayedBy) {
+          const lastWinnerIdx = game.players.findIndex(p => p.id === game.lastPlayedBy);
+          if (game.players[lastWinnerIdx].hand.length > 0) {
+            game.turnIndex = lastWinnerIdx;
+          } else {
+            findNextTurnIndex();
+          }
+        } else {
+          findNextTurnIndex();
+        }
+      } else {
+        findNextTurnIndex();
+      }
+
+      broadcastGameState();
+      triggerAITurnIfNeeded();
+    }
+
+    function findNextTurnIndex() {
+      const game = appState.game;
+      let nextIdx = (game.turnIndex + 1) % game.players.length;
+      let count = 0;
+
+      while (count < game.players.length) {
+        const p = game.players[nextIdx];
+        if (p.hand.length > 0 && !game.passedPlayers.includes(p.id)) {
+          game.turnIndex = nextIdx;
+          return;
+        }
+        nextIdx = (nextIdx + 1) % game.players.length;
+        count++;
+      }
+    }
+
+    /* ==========================================================================
+       5. ADVANCED AI ROUTINE
+       ========================================================================== */
+    let aiTimer = null;
+
+    function triggerAITurnIfNeeded() {
+      if (!appState.isHost || !appState.game || appState.game.status !== 'playing') return;
+
+      if (aiTimer) clearTimeout(aiTimer);
+
+      const game = appState.game;
+      const currPlayer = game.players[game.turnIndex];
+
+      if (currPlayer && currPlayer.isAI && currPlayer.hand.length > 0) {
+        aiTimer = setTimeout(() => {
+          processAITurn(currPlayer);
+        }, 800);
+      }
+    }
+
+    function processAITurn(aiPlayer) {
+      if (!appState.isHost || !appState.game) return;
+      const game = appState.game;
+
+      const groups = {};
+      aiPlayer.hand.forEach(c => {
+        groups[c.num] = groups[c.num] || [];
+        groups[c.num].push(c);
+      });
+
+      const tableCards = game.tableCards;
+      let chosenCards = null;
+
+      if (aiPlayer.aiDiff === 'easy') {
+        let validPlays = [];
+        if (tableCards.length === 0) {
+          Object.keys(groups).forEach(n => validPlays.push(groups[n]));
+          validPlays.sort((a, b) => a[0].num - b[0].num);
+        } else {
+          const reqCount = tableCards.length;
+          const reqNum = tableCards[0].num;
+          Object.keys(groups).forEach(n => {
+            const num = parseInt(n);
+            if (num < reqNum && groups[n].length >= reqCount) {
+              validPlays.push(groups[n].slice(0, reqCount));
+            }
+          });
+          validPlays.sort((a, b) => a[0].num - b[0].num);
+        }
+        if (validPlays.length > 0 && Math.random() > 0.2) {
+          chosenCards = validPlays[0];
+        }
+      } else {
+        if (tableCards.length === 0) {
+          const candidateGroups = Object.keys(groups).map(n => groups[n]);
+          const multiCardSets = candidateGroups.filter(g => g.length >= 2);
+          const singleCards = candidateGroups.filter(g => g.length === 1);
+
+          if (multiCardSets.length > 0) {
+            multiCardSets.sort((a, b) => {
+              if (b.length !== a.length) return b.length - a.length;
+              return b[0].num - a[0].num;
+            });
+            chosenCards = multiCardSets[0];
+          } else {
+            singleCards.sort((a, b) => b[0].num - a[0].num);
+            const weakSingles = singleCards.filter(g => g[0].num > 3);
+            if (weakSingles.length > 0) {
+              chosenCards = weakSingles[0];
+            } else {
+              chosenCards = singleCards[0];
+            }
+          }
+        } else {
+          const reqCount = tableCards.length;
+          const reqNum = tableCards[0].num;
+
+          const validOptions = [];
+          Object.keys(groups).forEach(n => {
+            const num = parseInt(n);
+            if (num < reqNum && groups[n].length >= reqCount) {
+              const surplus = groups[n].length - reqCount;
+              validOptions.push({
+                cards: groups[n].slice(0, reqCount),
+                num: num,
+                surplus: surplus
+              });
+            }
+          });
+
+          if (validOptions.length > 0) {
+            validOptions.sort((a, b) => {
+              const aExact = a.surplus === 0 ? 1 : 0;
+              const bExact = b.surplus === 0 ? 1 : 0;
+              if (aExact !== bExact) return bExact - aExact;
+              if (b.num !== a.num) return b.num - a.num;
+              return a.surplus - b.surplus;
+            });
+
+            const candidate = validOptions[0];
+            const isStrongCard = candidate.num <= 3;
+            const remainingHandCount = aiPlayer.hand.length;
+
+            if (isStrongCard && remainingHandCount > 3) {
+              const passProb = aiPlayer.aiDiff === 'hard' ? 0.7 : 0.4;
+              if (Math.random() < passProb) {
+                chosenCards = null;
+              } else {
+                chosenCards = candidate.cards;
+              }
+            } else {
+              chosenCards = candidate.cards;
+            }
+          }
+        }
+      }
+
+      if (chosenCards && chosenCards.length > 0) {
+        const cardIds = chosenCards.map(c => c.id);
+        executePlayCard(aiPlayer.id, cardIds);
+      } else {
+        executePass(aiPlayer.id);
+      }
+    }
+
+    /* ==========================================================================
+       6. CLASS RANKS & AUTOMATED EXCHANGE PHASE
+       ========================================================================== */
+    function endGameRound() {
+      const game = appState.game;
+      game.status = 'finished';
+
+      const me = game.players.find(p => p.id === appState.myId);
+      if (me) {
+        saveStats(me.finishedRank || game.players.length, game.players.length);
+      }
+
+      const titles = RANK_TITLES[game.players.length] || RANK_TITLES[8];
+      game.players.forEach(p => {
+        p.rankTitle = titles[(p.finishedRank || game.players.length) - 1];
+      });
+
+      broadcastGameState();
+      showRoundResultModal();
+    }
+
+    function showRoundResultModal() {
+      if (!appState.gameSync) return;
+      const game = appState.gameSync;
+
+      dom.roundRankingList.innerHTML = '';
+      const sorted = [...game.players].sort((a, b) => (a.finishedRank || 99) - (b.finishedRank || 99));
+
+      sorted.forEach(p => {
+        const row = document.createElement('div');
+        row.className = 'flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-xs font-bold';
+        row.innerHTML = `
+          <div class="flex items-center space-x-2">
+            <span class="w-6 h-6 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center justify-center font-black">
+              ${p.finishedRank}
+            </span>
+            <span class="text-slate-200">${p.name}</span>
+          </div>
+          <span class="text-amber-400 font-black">${p.rankTitle || '平民'}</span>
+        `;
+        dom.roundRankingList.appendChild(row);
+      });
+
+      if (!appState.isHost) {
+        dom.btnNextRound.innerHTML = '<span>⏳ ホストの開始を待っています...</span>';
+        dom.btnNextRound.disabled = true;
+      } else {
+        dom.btnNextRound.innerHTML = '<span>🃏 カード交換・次の試合へ進む</span>';
+        dom.btnNextRound.disabled = false;
+      }
+
+      dom.modalRoundResult.classList.remove('hidden');
+    }
+
+    dom.btnNextRound.addEventListener('click', () => {
+      dom.modalRoundResult.classList.add('hidden');
+      if (appState.isHost) {
+        initExchangePhase();
+      }
+    });
+
+    function initExchangePhase() {
+      const game = appState.game;
+      const initialHandCount = game.players.length >= 6 ? 9 : 11;
+
+      game.players.forEach(p => {
+        p.prevRank = p.finishedRank || game.players.length;
+        p.hasExchanged = false;
+      });
+
+      const deck = createPyramidDeck();
+      game.players.forEach(p => {
+        p.hand = deck.splice(0, initialHandCount).sort((a, b) => a.num - b.num);
+        p.finishedRank = null;
+        p.passed = false;
+      });
+
+      game.roundCount++;
+      game.status = 'exchange';
+      game.tableCards = [];
+      game.passedPlayers = [];
+      game.lastMoveInfo = `ラウンド ${game.roundCount} (カード交換フェーズ)`;
+
+      const numPlayers = game.players.length;
+      const sortedByPrev = [...game.players].sort((a, b) => a.prevRank - b.prevRank);
+
+      if (numPlayers >= 3) {
+        const top1 = sortedByPrev[0];
+        const last1 = sortedByPrev[sortedByPrev.length - 1];
+        const count1 = numPlayers >= 4 ? 2 : 1;
+
+        const last1Strongest = [...last1.hand].sort((a, b) => a.num - b.num).slice(0, count1);
+        last1.hand = last1.hand.filter(c => !last1Strongest.some(sc => sc.id === c.id));
+        top1.hand.push(...last1Strongest);
+        top1.hand.sort((a, b) => a.num - b.num);
+
+        if (numPlayers >= 4) {
+          const top2 = sortedByPrev[1];
+          const last2 = sortedByPrev[sortedByPrev.length - 2];
+          const count2 = 1;
+
+          const last2Strongest = [...last2.hand].sort((a, b) => a.num - b.num).slice(0, count2);
+          last2.hand = last2.hand.filter(c => !last2Strongest.some(sc => sc.id === c.id));
+          top2.hand.push(...last2Strongest);
+          top2.hand.sort((a, b) => a.num - b.num);
+        }
+      }
+
+      sortedByPrev.forEach(p => {
+        if (!p.isAI) return;
+
+        let countToGive = 0;
+        let targetPlayer = null;
+
+        if (p.prevRank === 1 && numPlayers >= 3) {
+          countToGive = numPlayers >= 4 ? 2 : 1;
+          targetPlayer = sortedByPrev[sortedByPrev.length - 1];
+        } else if (p.prevRank === 2 && numPlayers >= 4) {
+          countToGive = 1;
+          targetPlayer = sortedByPrev[sortedByPrev.length - 2];
+        }
+
+        if (countToGive > 0 && targetPlayer) {
+          const weakestCards = [...p.hand].sort((a, b) => b.num - a.num).slice(0, countToGive);
+          p.hand = p.hand.filter(c => !weakestCards.some(wc => wc.id === c.id));
+          targetPlayer.hand.push(...weakestCards);
+          targetPlayer.hand.sort((a, b) => a.num - b.num);
+          p.hasExchanged = true;
+        }
+      });
+
+      broadcastGameState();
+      checkPromptExchange();
+    }
+
+    function checkPromptExchange() {
+      if (!appState.gameSync) return;
+      const game = appState.gameSync;
+      if (game.status !== 'exchange') return;
+
+      const me = game.players.find(p => p.id === appState.myId);
+      if (!me) return;
+
+      const numPlayers = game.players.length;
+
+      let countNeeded = 0;
+      let targetRankName = '';
+
+      if (me.prevRank === 1 && numPlayers >= 3) {
+        countNeeded = numPlayers >= 4 ? 2 : 1;
+        targetRankName = '大貧民';
+      } else if (me.prevRank === 2 && numPlayers >= 4) {
+        countNeeded = 1;
+        targetRankName = '貧民';
+      }
+
+      if (countNeeded > 0 && !me.hasExchanged) {
+        showExchangeModal(me, countNeeded, targetRankName);
+      } else {
+        if (appState.isHost) {
+          finishExchangeAndStartRound();
+        }
+      }
+    }
+
+    function showExchangeModal(player, count, targetRankName = '下位プレイヤー') {
+      dom.exchangeInstruction.innerText = `${targetRankName} に渡す不要なカードを ${count} 枚選んでください`;
+      dom.exchangeCardsContainer.innerHTML = '';
+      appState.selectedCardIds = [];
+      dom.btnConfirmExchange.disabled = true;
+
+      player.hand.forEach(card => {
+        const el = createCardElement(card);
+        el.addEventListener('click', () => {
+          if (appState.selectedCardIds.includes(card.id)) {
+            appState.selectedCardIds = appState.selectedCardIds.filter(id => id !== card.id);
+            el.classList.remove('card-selected');
+          } else {
+            if (appState.selectedCardIds.length < count) {
+              appState.selectedCardIds.push(card.id);
+              el.classList.add('card-selected');
+            }
+          }
+          dom.btnConfirmExchange.disabled = appState.selectedCardIds.length !== count;
+        });
+        dom.exchangeCardsContainer.appendChild(el);
+      });
+
+      dom.modalExchange.classList.remove('hidden');
+    }
+
+    dom.btnConfirmExchange.addEventListener('click', () => {
+      dom.modalExchange.classList.add('hidden');
+      if (appState.isHost) {
+        handleExchangeSubmit(appState.myId, appState.selectedCardIds);
+      } else {
+        appState.hostConn.send({
+          type: 'ACTION_EXCHANGE',
+          playerId: appState.myId,
+          cardIds: appState.selectedCardIds
+        });
+      }
+    });
+
+    function handleExchangeSubmit(playerId, cardIds) {
+      if (!appState.isHost || !appState.game) return;
+      const game = appState.game;
+      const player = game.players.find(p => p.id === playerId);
+      if (!player) return;
+
+      const sortedByPrev = [...game.players].sort((a, b) => a.prevRank - b.prevRank);
+      let targetPlayer = null;
+
+      if (player.prevRank === 1) targetPlayer = sortedByPrev[sortedByPrev.length - 1];
+      if (player.prevRank === 2) targetPlayer = sortedByPrev[sortedByPrev.length - 2];
+
+      if (targetPlayer) {
+        const cardsToGive = player.hand.filter(c => cardIds.includes(c.id));
+        player.hand = player.hand.filter(c => !cardIds.includes(c.id));
+        targetPlayer.hand.push(...cardsToGive);
+        targetPlayer.hand.sort((a, b) => a.num - b.num);
+        player.hasExchanged = true;
+      }
+
+      finishExchangeAndStartRound();
+    }
+
+    function finishExchangeAndStartRound() {
+      if (!appState.isHost || !appState.game) return;
+      const game = appState.game;
+
+      const numPlayers = game.players.length;
+      const pendingHumans = game.players.filter(p => {
+        if (p.isAI || p.hasExchanged) return false;
+        if (p.prevRank === 1 && numPlayers >= 3) return true;
+        if (p.prevRank === 2 && numPlayers >= 4) return true;
+        return false;
+      });
+
+      if (pendingHumans.length > 0) {
+        return;
+      }
+
+      game.status = 'playing';
+      game.finishedCount = 0;
+      game.tableCards = [];
+      game.passedPlayers = [];
+
+      const sortedByPrev = [...game.players].sort((a, b) => b.prevRank - a.prevRank);
+      const lowestPlayer = sortedByPrev[0];
+      game.turnIndex = game.players.findIndex(p => p.id === lowestPlayer.id);
+
+      game.lastMoveInfo = `ラウンド ${game.roundCount} 開始！ (${lowestPlayer.name} からスタート)`;
+
+      broadcastGameState();
+      triggerAITurnIfNeeded();
+    }
+
+    /* ==========================================================================
+       7. UI RENDERING ENGINE
+       ========================================================================== */
+    function createCardElement(card) {
+      const cardEl = document.createElement('div');
+      const num = card.num;
+      
+      let tierClass = 'card-rank-10';
+      if (num === 1) tierClass = 'card-rank-1';
+      else if (num <= 3) tierClass = 'card-rank-2';
+      else if (num <= 6) tierClass = 'card-rank-4';
+      else if (num <= 9) tierClass = 'card-rank-7';
+
+      cardEl.className = `card-base ${tierClass} w-11 h-16 sm:w-14 sm:h-20 rounded-xl flex flex-col justify-between p-1.5 cursor-pointer relative select-none flex-shrink-0`;
+      
+      cardEl.innerHTML = `
+        <div class="text-xs font-black leading-none">${num}</div>
+        <div class="text-center text-sm sm:text-base font-black font-cinzel">${num === 1 ? '👑' : num}</div>
+        <div class="text-xs font-black leading-none text-right">${num}</div>
+      `;
+      return cardEl;
+    }
+
+    function renderLobby() {
+      dom.lobbyCount.innerText = appState.players.length;
+      dom.lobbyPlayerList.innerHTML = '';
+
+      appState.players.forEach((p, idx) => {
+        const item = document.createElement('div');
+        item.className = 'flex justify-between items-center bg-slate-900 px-3 py-2 rounded-lg border border-slate-800 text-xs';
+        item.innerHTML = `
+          <div class="flex items-center space-x-2">
+            <span class="font-bold text-amber-400">P${idx + 1}</span>
+            <span class="font-bold text-slate-200">${p.name}</span>
+            ${p.id === appState.myId ? '<span class="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.2 rounded">あなた</span>' : ''}
+            ${p.isAI ? `<span class="text-[10px] bg-sky-500/20 text-sky-300 px-1.5 py-0.2 rounded">AI (${p.aiDiff})</span>` : ''}
+          </div>
+          ${appState.isHost && p.isAI ? `<button onclick="removeLobbyAI('${p.id}')" class="text-rose-400 hover:text-rose-300 text-xs font-bold">削除</button>` : ''}
+        `;
+        dom.lobbyPlayerList.appendChild(item);
+      });
+
+      if (appState.isHost) {
+        dom.hostAiControls.classList.remove('hidden');
+        dom.btnLobbyStart.classList.remove('hidden');
+        dom.lobbyStatusBadge.innerText = 'ホスト (待機中)';
+      } else {
+        dom.hostAiControls.classList.add('hidden');
+        dom.btnLobbyStart.classList.add('hidden');
+        dom.lobbyStatusBadge.innerText = '参加中 (準備完了)';
+      }
+    }
+
+    function renderGameScreen() {
+      showScreen(dom.screenGame);
+      const game = appState.gameSync;
+      if (!game) return;
+
+      const me = game.players.find(p => p.id === appState.myId);
+      const opponents = game.players.filter(p => p.id !== appState.myId);
+
+      dom.opponentsContainer.innerHTML = '';
+      opponents.forEach(opp => {
+        const isTurn = game.players[game.turnIndex].id === opp.id;
+        const isPassed = game.passedPlayers.includes(opp.id);
+
+        const oppEl = document.createElement('div');
+        oppEl.className = `p-2 rounded-xl border transition ${isTurn ? 'bg-amber-500/10 border-amber-500' : 'bg-slate-900/80 border-slate-800'}`;
+        oppEl.innerHTML = `
+          <div class="flex justify-between items-center mb-1">
+            <span class="text-xs font-bold text-slate-200 truncate">${opp.name}</span>
+            <span class="text-[10px] px-1.5 py-0.5 rounded ${isPassed ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-slate-800 text-slate-400'}">
+              ${isPassed ? 'PASSED' : `${opp.hand.length}枚`}
+            </span>
+          </div>
+          <div class="flex space-x-1 overflow-hidden h-6 items-center">
+            ${Array(Math.min(opp.hand.length, 11)).fill(0).map(() => `<div class="w-2 h-4 bg-slate-700 rounded-sm border border-slate-600"></div>`).join('')}
+          </div>
+        `;
+        dom.opponentsContainer.appendChild(oppEl);
+      });
+
+      dom.roundRankInfo.innerText = `ROUND ${game.roundCount}`;
+      dom.tableLastMove.innerText = game.lastMoveInfo || '';
+
+      dom.tableCardsDisplay.innerHTML = '';
+      if (game.tableCards.length > 0) {
+        game.tableCards.forEach(card => {
+          dom.tableCardsDisplay.appendChild(createCardElement(card));
+        });
+      } else {
+        dom.tableCardsDisplay.innerHTML = `<div class="text-xs text-slate-500 italic">場にカードはありません（自由に出せます）</div>`;
+      }
+
+      if (me) {
+        dom.myPlayerName.innerText = me.name;
+        dom.myPlayerRank.innerText = me.rankTitle || '平民';
+
+        const isMyTurn = game.players[game.turnIndex].id === appState.myId;
+        const isIPassed = game.passedPlayers.includes(appState.myId);
+
+        if (isMyTurn && !isIPassed && game.status === 'playing') {
+          dom.myTurnIndicator.classList.remove('opacity-0');
+          dom.btnPass.disabled = false;
+        } else {
+          dom.myTurnIndicator.classList.add('opacity-0');
+          dom.btnPass.disabled = true;
+          dom.btnPlayCard.disabled = true;
+        }
+
+        dom.myHandContainer.innerHTML = '';
+        me.hand.forEach(card => {
+          const cardEl = createCardElement(card);
+          const isSelected = appState.selectedCardIds.includes(card.id);
+          if (isSelected) cardEl.classList.add('card-selected');
+
+          cardEl.addEventListener('click', () => {
+            if (!isMyTurn || isIPassed || game.status !== 'playing') return;
+
+            if (isSelected) {
+              appState.selectedCardIds = appState.selectedCardIds.filter(id => id !== card.id);
+            } else {
+              const selectedCards = me.hand.filter(c => appState.selectedCardIds.includes(c.id));
+              if (selectedCards.length === 0 || selectedCards[0].num === card.num) {
+                appState.selectedCardIds.push(card.id);
+              } else {
+                appState.selectedCardIds = [card.id];
+              }
+            }
+            
+            validatePlayButton(me);
+            renderGameScreen();
+          });
+
+          dom.myHandContainer.appendChild(cardEl);
+        });
+      }
+
+      if (game.status === 'exchange') {
+        checkPromptExchange();
+      }
+    }
+
+    function validatePlayButton(myPlayer) {
+      const selected = myPlayer.hand.filter(c => appState.selectedCardIds.includes(c.id));
+      if (selected.length === 0) {
+        dom.btnPlayCard.disabled = true;
+        return;
+      }
+
+      const table = appState.gameSync.tableCards;
+      const num = selected[0].num;
+
+      if (table.length === 0) {
+        dom.btnPlayCard.disabled = false;
+      } else {
+        if (selected.length === table.length && num < table[0].num) {
+          dom.btnPlayCard.disabled = false;
+        } else {
+          dom.btnPlayCard.disabled = true;
+        }
+      }
+    }
+
+    /* ==========================================================================
+       8. USER CONTROLS & EVENT LISTENERS
+       ========================================================================== */
+    dom.btnStartSolo.addEventListener('click', () => {
+      const myName = dom.playerNameInput.value.trim() || 'プレイヤー1';
+      const count = parseInt(dom.soloPlayersCount?.value || "4");
+      const diff = dom.soloAiDifficulty?.value || 'normal';
+
+      appState.mode = 'solo';
+      appState.isHost = true;
+      appState.myId = 'HOST_LOCAL';
+
+      const players = [{ id: 'HOST_LOCAL', name: myName, isAI: false }];
+      for (let i = 1; i < count; i++) {
+        players.push({
+          id: `AI_${i}`,
+          name: `CPU ${i}`,
+          isAI: true,
+          aiDiff: diff
+        });
+      }
+
+      appState.players = players;
+      startNewGame(players);
+    });
+
+    dom.btnCreateOnline.addEventListener('click', () => {
+      const myName = dom.playerNameInput.value.trim() || 'ホスト';
+      appState.mode = 'online';
+      appState.isHost = true;
+
+      initPeer(null, (roomCode) => {
+        dom.displayRoomCode.innerText = roomCode;
+        appState.players = [{ id: appState.myId, name: myName, isAI: false, conn: null }];
+        renderLobby();
+        showScreen(dom.screenLobby);
+      });
+    });
+
+    dom.btnJoinOnline.addEventListener('click', () => {
+      const code = normalizeRoomCode(dom.joinRoomId.value);
+      if (!code || code.length < 4) {
+        showToast('有効な部屋コードを入力してください');
+        return;
+      }
+
+      const myName = dom.playerNameInput.value.trim() || 'ゲスト';
+      appState.mode = 'online';
+      appState.isHost = false;
+
+      initPeer(null, () => {
+        const targetPeerId = `PYR-${code}`;
+        const conn = appState.peer.connect(targetPeerId);
+        appState.hostConn = conn;
+
+        const connTimeout = setTimeout(() => {
+          if (conn && !conn.open) {
+            showToast('接続がタイムアウトしました。部屋が存在しないか、通信環境を確認してください。');
+          }
+        }, 8000);
+
+        conn.on('open', () => {
+          clearTimeout(connTimeout);
+          conn.send({ type: 'JOIN_LOBBY', name: myName });
+          dom.displayRoomCode.innerText = code;
+          showScreen(dom.screenLobby);
+        });
+
+        conn.on('data', (data) => {
+          if (data.type === 'LOBBY_STATE') {
+            appState.players = data.players;
+            renderLobby();
+          } else if (data.type === 'SYNC_STATE') {
+            appState.gameSync = data.state;
+            renderGameScreen();
+          } else if (data.type === 'ERROR') {
+            showToast(data.message);
+          }
+        });
+
+        conn.on('error', (err) => {
+          clearTimeout(connTimeout);
+          console.warn('Connection error:', err);
+          showToast('ホストへの接続に失敗しました。');
+        });
+
+        conn.on('close', () => {
+          clearTimeout(connTimeout);
+          showToast('ホストとの接続が切断されました');
+          showScreen(dom.screenTitle);
+        });
+      });
+    });
+
+    dom.btnAddAi.addEventListener('click', () => {
+      if (!appState.isHost || appState.players.length >= 8) {
+        showToast('参加人数は最大8人までです');
+        return;
+      }
+      const diff = dom.lobbyAiDiff.value;
+      const aiCount = appState.players.filter(p => p.isAI).length + 1;
+      
+      appState.players.push({
+        id: `LOBBY_AI_${Date.now()}_${aiCount}`,
+        name: `CPU ${aiCount}`,
+        isAI: true,
+        aiDiff: diff,
+        conn: null
+      });
+      broadcastLobbyState();
+    });
+
+    window.removeLobbyAI = function(aiId) {
+      if (!appState.isHost) return;
+      appState.players = appState.players.filter(p => p.id !== aiId);
+      broadcastLobbyState();
+    };
+
+    dom.btnCopyRoom.addEventListener('click', () => {
+      const code = dom.displayRoomCode.innerText;
+      navigator.clipboard.writeText(code).then(() => {
+        showToast('部屋コードをコピーしました！');
+      }).catch(() => {
+        showToast(`コード: ${code}`);
+      });
+    });
+
+    dom.btnLobbyStart.addEventListener('click', () => {
+      if (!appState.isHost) return;
+      if (appState.players.length < 2) {
+        showToast('対戦相手（プレイヤーまたはAI）が不足しています');
+        return;
+      }
+      startNewGame(appState.players);
+    });
+
+    dom.btnPlayCard.addEventListener('click', () => {
+      if (appState.selectedCardIds.length === 0) return;
+
+      if (appState.isHost) {
+        executePlayCard(appState.myId, appState.selectedCardIds);
+      } else {
+        appState.hostConn.send({
+          type: 'ACTION_PLAY',
+          playerId: appState.myId,
+          cardIds: appState.selectedCardIds
+        });
+      }
+      appState.selectedCardIds = [];
+    });
+
+    dom.btnPass.addEventListener('click', () => {
+      if (appState.isHost) {
+        executePass(appState.myId);
+      } else {
+        appState.hostConn.send({
+          type: 'ACTION_PASS',
+          playerId: appState.myId
+        });
+      }
+      appState.selectedCardIds = [];
+    });
+
+    dom.btnLeave.addEventListener('click', () => {
+      showConfirm('ゲームを中断してタイトル画面に戻りますか？', () => {
+        if (aiTimer) clearTimeout(aiTimer);
+        if (appState.peer) {
+          try { appState.peer.destroy(); } catch (e) {}
+        }
+        showScreen(dom.screenTitle);
+      });
+    });
+
+    dom.btnLobbyLeave.addEventListener('click', () => {
+      if (appState.peer) {
+        try { appState.peer.destroy(); } catch (e) {}
+      }
+      showScreen(dom.screenTitle);
+    });
+
+    dom.btnStats.addEventListener('click', () => {
+      const s = appState.stats;
+      const winRate = s.plays > 0 ? ((s.wins / s.plays) * 100).toFixed(1) : '0.0';
+
+      let html = `
+        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2">
+          <div class="flex justify-between font-bold text-slate-300">
+            <span>総対戦数:</span> <span class="text-amber-400">${s.plays} 回</span>
+          </div>
+          <div class="flex justify-between font-bold text-slate-300">
+            <span>勝利数 (1位):</span> <span class="text-amber-400">${s.wins} 勝</span>
+          </div>
+          <div class="flex justify-between font-bold text-slate-300">
+            <span>勝率:</span> <span class="text-amber-400">${winRate} %</span>
+          </div>
+        </div>
+      `;
+      dom.statsContent.innerHTML = html;
+      dom.modalStats.classList.remove('hidden');
+    });
+
+    dom.btnCloseStats.addEventListener('click', () => dom.modalStats.classList.add('hidden'));
+    dom.btnRule.addEventListener('click', () => dom.modalRule.classList.remove('hidden'));
+    dom.btnCloseRule.addEventListener('click', () => dom.modalRule.classList.add('hidden'));
+
+  </script>
+</body>
+</html>
